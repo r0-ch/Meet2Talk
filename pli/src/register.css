@@ -2,12 +2,11 @@
 * {
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
 }
 
 body {
     font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, var(--bleu), #f26161);
+    background: linear-gradient(135deg, var(--bleu), var(--rouge));
     height: 100vh;
     display: flex;
     justify-content: center;
