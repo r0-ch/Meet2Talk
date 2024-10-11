@@ -5,8 +5,7 @@ import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
-import Register from "./register";
-import Login from "./login";
+import Login from "./routes/room";
 
 
 const root = ReactDOM.createRoot(
@@ -19,12 +18,12 @@ const router = createBrowserRouter([
     element: <App/>,
   },
   {
-    path: "/register",
-    element: <Register/>,
+    path: "/room",
+    element: <RoomCreate/>,
   },
   {
-    path: "/login",
-    element: <Login/>,
+    path: "/room/:roomId";
+    element: <Room/>,
   }
 ]);
 

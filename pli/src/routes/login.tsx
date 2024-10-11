@@ -1,4 +1,4 @@
-import "./login.css";
+import "@routes/login.css";
 
 export default function Login() {
   return (
