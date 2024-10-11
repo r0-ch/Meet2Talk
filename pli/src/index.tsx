@@ -1,11 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './App';
+import "./style.css"
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
-import Login from "./routes/room";
+import Login from "./routes/login";
 
 
 const root = ReactDOM.createRoot(
@@ -15,16 +14,16 @@ const root = ReactDOM.createRoot(
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <App/>,
+    element: <Login/>,
   },
-  {
-    path: "/room",
-    element: <RoomCreate/>,
-  },
-  {
-    path: "/room/:roomId";
-    element: <Room/>,
-  }
+  // {
+  //   path: "/room",
+  //   element: <RoomCreate/>,
+  // },
+  // {
+  //   path: "/room/:roomId";
+  //   element: <Room/>,
+  // }
 ]);
 
 root.render(
