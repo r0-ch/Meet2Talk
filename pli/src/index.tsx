@@ -7,7 +7,8 @@ import reportWebVitals from './reportWebVitals';
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import Register from "./register";
 import Login from "./login";
-
+import CreateRoom from './chat/CreateRoom';
+import Room from './chat/Room';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -25,6 +26,14 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <Login/>,
+  },
+  {
+    path: "/room",
+    element: <CreateRoom/>,
+  },
+  {
+    path: "/room/:id",
+    element: <Room/>,
   }
 ]);
 
