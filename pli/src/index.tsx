@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './App';
+import "./style.css"
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
@@ -9,6 +8,7 @@ import Register from "./register";
 import Login from "./login";
 import CreateRoom from './chat/CreateRoom';
 import Room from './chat/Room';
+import JoinRoom from './routes/home';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -17,7 +17,7 @@ const root = ReactDOM.createRoot(
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <App/>,
+    element: <JoinRoom/>,
   },
   {
     path: "/register",
@@ -35,6 +35,14 @@ const router = createBrowserRouter([
     path: "/room/:id",
     element: <Room/>,
   }
+  // {
+  //   path: "/room",
+  //   element: <RoomCreate/>,
+  // },
+  // {
+  //   path: "/room/:roomId";
+  //   element: <Room/>,
+  // }
 ]);
 
 root.render(
