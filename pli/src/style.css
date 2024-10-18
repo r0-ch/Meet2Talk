@@ -545,10 +545,6 @@ video {
   display: none;
 }
 
-.mb-2 {
-  margin-bottom: 0.5rem;
-}
-
 .mb-4 {
   margin-bottom: 1rem;
 }
@@ -565,6 +561,14 @@ video {
   margin-left: 0.5rem;
 }
 
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
 .mr-2 {
   margin-right: 0.5rem;
 }
@@ -577,12 +581,24 @@ video {
   margin-top: 5rem;
 }
 
-.mt-4 {
-  margin-top: 1rem;
-}
-
 .mt-3 {
   margin-top: 0.75rem;
+}
+
+.ml-auto {
+  margin-left: auto;
+}
+
+.ml-0 {
+  margin-left: 0px;
+}
+
+.ml-1 {
+  margin-left: 0.25rem;
+}
+
+.ml-10 {
+  margin-left: 2.5rem;
 }
 
 .block {
@@ -593,40 +609,32 @@ video {
   display: flex;
 }
 
-.h-24 {
-  height: 6rem;
-}
-
 .h-5 {
   height: 1.25rem;
-}
-
-.h-8 {
-  height: 2rem;
-}
-
-.h-\[130px\] {
-  height: 130px;
-}
-
-.h-full {
-  height: 100%;
 }
 
 .h-screen {
   height: 100vh;
 }
 
+.h-24 {
+  height: 6rem;
+}
+
+.h-8 {
+  height: 2rem;
+}
+
 .h-\[500px\] {
   height: 500px;
 }
 
-.w-0 {
-  width: 0px;
+.h-full {
+  height: 100%;
 }
 
-.w-24 {
-  width: 6rem;
+.w-0 {
+  width: 0px;
 }
 
 .w-5 {
@@ -637,24 +645,20 @@ video {
   width: 16rem;
 }
 
-.w-8 {
-  width: 2rem;
-}
-
-.w-80 {
-  width: 20rem;
-}
-
 .w-96 {
   width: 24rem;
 }
 
-.w-\[250px\] {
-  width: 250px;
-}
-
 .w-full {
   width: 100%;
+}
+
+.w-24 {
+  width: 6rem;
+}
+
+.w-8 {
+  width: 2rem;
 }
 
 .w-\[80\%\] {
@@ -697,16 +701,28 @@ video {
   gap: 63vw;
 }
 
+.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(1rem * var(--tw-space-y-reverse));
+}
+
 .space-x-2 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 0;
   margin-right: calc(0.5rem * var(--tw-space-x-reverse));
   margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
 }
 
-.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+.space-y-2 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
-  margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));
-  margin-bottom: calc(1rem * var(--tw-space-y-reverse));
+  margin-top: calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));
+  margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
+}
+
+.space-x-4 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 0;
+  margin-right: calc(1rem * var(--tw-space-x-reverse));
+  margin-left: calc(1rem * calc(1 - var(--tw-space-x-reverse)));
 }
 
 .self-end {
@@ -785,6 +801,11 @@ video {
 .py-40 {
   padding-top: 10rem;
   padding-bottom: 10rem;
+}
+
+.px-2 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
 }
 
 .text-center {
