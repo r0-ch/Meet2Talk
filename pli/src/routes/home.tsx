@@ -1,15 +1,31 @@
 import { useState } from "react";
 import { ChevronRightIcon, ChevronLeftIcon } from '@heroicons/react/24/solid';
 
-
 export default function JoinRoom() {
   const [username, setUsername] = useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // État pour gérer la visibilité de la sidebar
+  const [selectedLanguage, setSelectedLanguage] = useState("fr");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [tags, setTags] = useState<string[]>([]); // État pour gérer les tags
+  const [tagInput, setTagInput] = useState(""); // État pour l'entrée du tag
 
   const joinRandomRoom = () => {
     const randomRoom = Math.random().toString(36).substring(2, 10); // Génère un ID de room aléatoire
-    console.log(`User: ${username} joined Room: ${randomRoom}`);
+    console.log(`User: ${username} joined Room: ${randomRoom} with Language: ${selectedLanguage} and Tags: ${tags}`);
     // Rediriger ou gérer la logique pour rejoindre la room
+  };
+
+  // Fonction pour ajouter un tag
+  const addTag = (e : any) => {
+    e.preventDefault();
+    if (tagInput && !tags.includes(tagInput)) {
+      setTags([...tags, tagInput]);
+      setTagInput(""); // Réinitialise l'entrée du tag après ajout
+    }
+  };
+
+  // Fonction pour supprimer un tag
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
   return (
@@ -69,9 +85,51 @@ export default function JoinRoom() {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="fr">Français</option>
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+              <option value="es">Español</option>
+              <option value="de">Deutsch</option>
+            </select>
+
+            {/* Input pour ajouter des tags */}
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="Add a tag"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={addTag}
+                className="w-full bg-green-500 text-white py-2 rounded transition duration-300 ease-in-out transform hover:bg-green-600 hover:scale-105"
+              >
+                Add Tag
+              </button>
+            </div>
+            {/* Afficher la liste des tags */}
+            <div className="flex flex-wrap space-x-2 mt-4">
+              {tags.map((tag, index) => (
+                <span key={index} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full flex items-center">
+                  {tag}
+                  <button
+                    onClick={() => removeTag(tag)}
+                    className="ml-2 text-red-500 hover:text-red-700 focus:outline-none"
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+            </div>
             <button
               type="submit"
-              className="w-full bg-blue-500 text-white py-2 rounded transition duration-300 ease-in-out transform hover:bg-blue-600 hover:scale-105"
+              className="w-full bg-gray-200 text-white py-2 rounded transition duration-300 ease-in-out transform hover:bg-blue-600 hover:scale-105"
             >
               Join Room
             </button>
