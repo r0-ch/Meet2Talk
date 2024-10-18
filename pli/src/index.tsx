@@ -7,7 +7,7 @@ import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import CreateRoom from './chat/CreateRoom';
 import Room from './chat/Room';
 import RoomInterface from './chat/RoomInterface';
-import JoinRoom from './routes/home';
+import Home from './routes/home';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -16,7 +16,7 @@ const root = ReactDOM.createRoot(
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <JoinRoom/>,
+    element: <Home/>,
   },
   {
     path: "/room/create",
