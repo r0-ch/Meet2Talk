@@ -4,10 +4,9 @@ import "./style.css"
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 import {createBrowserRouter, RouterProvider} from "react-router-dom";
-import Register from "./register";
-import Login from "./login";
 import CreateRoom from './chat/CreateRoom';
 import Room from './chat/Room';
+import RoomInterface from './chat/RoomInterface';
 import JoinRoom from './routes/home';
 
 const root = ReactDOM.createRoot(
@@ -20,16 +19,12 @@ const router = createBrowserRouter([
     element: <JoinRoom/>,
   },
   {
-    path: "/register",
-    element: <Register/>,
-  },
-  {
-    path: "/login",
-    element: <Login/>,
-  },
-  {
-    path: "/room",
+    path: "/room/create",
     element: <CreateRoom/>,
+  },
+  {
+    path: "/room/interface",
+    element: <RoomInterface/>,
   },
   {
     path: "/room/:id",
