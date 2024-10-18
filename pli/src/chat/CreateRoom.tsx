@@ -6,7 +6,7 @@ const CreateRoom = () => {
 
     function create() {
         const id = uuidv4();
-        navigate(`/room/create${id}`);
+        navigate(`/room/interface`);
     }
 
     return (
