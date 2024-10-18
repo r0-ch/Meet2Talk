@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 const RoomInterface = () => {
-    const navigate = useNavigate();
+    const { user2Name } = useParams<{ user2Name: string }>(); // Récupérer le nom de l'utilisateur 2
     const [currentMessage, setCurrentMessage] = useState('');
     const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]); // Pour stocker les images de profil
 
-     // Liste de 10 images de profil
-     const allProfilePictures = [
+    // Liste de 10 images de profil
+    const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
         "https://picsum.photos/id/58/367/267",
@@ -36,7 +36,6 @@ const RoomInterface = () => {
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault(); // Empêche le rechargement de la page
         if (currentMessage.trim()) {
-            // Ajoute le message à la liste avec l'utilisateur
             const user = messages.length % 2 === 0 ? 1 : 2; // Utilisateur 1 ou 2 basé sur l'index
             setMessages([...messages, { text: currentMessage, user }]);
             setCurrentMessage(''); // Réinitialise le champ de saisie
@@ -87,7 +86,9 @@ const RoomInterface = () => {
                             <div
                                 className={`p-2 rounded ${msg.user === 1 ? 'bg-blue-200' : 'bg-green-200'}`}
                             >
-                                <span className="font-semibold">Utilisateur {msg.user}: </span>
+                                <span className="font-semibold">
+                                    {msg.user === 1 ? 'Utilisateur 1' : user2Name}: {/* Affiche le nom de l'utilisateur 2 */}
+                                </span>
                                 <span>{msg.text}</span>
                             </div>
                             {msg.user === 2 && (
@@ -121,6 +122,6 @@ const RoomInterface = () => {
             </form>
         </div>
     );
-}
+};
 
 export default RoomInterface;

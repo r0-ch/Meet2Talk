@@ -1,17 +1,16 @@
 import { useNavigate } from 'react-router-dom';
-import { v4 as uuidv4 } from 'uuid';
 
 const CreateRoom = () => {
     const navigate = useNavigate();
 
-    function create() {
-        const id = uuidv4();
-        navigate(`/room/interface`);
-    }
+    const handleCreateRoom = () => {
+        const user2Name = "Cyrik"; // Nom de l'utilisateur 2
+        navigate(`/room/interface/${user2Name}`);
+    };
 
     return (
-        <button onClick={create}>Create room</button>
+        <button onClick={handleCreateRoom}>Create Room</button>
     );
-}
+};
 
 export default CreateRoom;

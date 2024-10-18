@@ -33,7 +33,7 @@ export default function Home() {
       return;
     }
     setError(""); // Réinitialise l'erreur si le pseudo est valide
-    navigate(`room/interface`);
+    navigate(`room/create`);
   };
 
   return (

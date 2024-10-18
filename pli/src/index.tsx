@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import "./style.css"
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
-import {createBrowserRouter, RouterProvider} from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import CreateRoom from './chat/CreateRoom';
 import Room from './chat/Room';
 import RoomInterface from './chat/RoomInterface';
@@ -16,19 +16,19 @@ const root = ReactDOM.createRoot(
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Home/>,
+    element: <Home />,
   },
   {
     path: "/room/create",
-    element: <CreateRoom/>,
+    element: <CreateRoom />,
   },
   {
-    path: "/room/interface",
-    element: <RoomInterface/>,
+    path: "/room/interface/:user2Name",
+    element: <RoomInterface />,
   },
   {
     path: "/room/:id",
-    element: <Room/>,
+    element: <Room />,
   }
   // {
   //   path: "/room",
