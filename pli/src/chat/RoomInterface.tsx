@@ -1,8 +1,14 @@
+import React from 'react';
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 
 const RoomInterface = () => {
-    const { user2Name } = useParams<{ user2Name: string }>(); // Récupérer le nom de l'utilisateur 2
+    // Récupérer le roomId visible dans l'URL
+    const { roomId } = useParams<{ roomId: string }>();
+
+    // Récupérer le username passé dans le state
+    const location = useLocation();
+    const { username } = location.state || { username: 'You' };  // Default à 'Guest' si username absent
     const [currentMessage, setCurrentMessage] = useState('');
     const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]); // Pour stocker les images de profil
@@ -87,7 +93,7 @@ const RoomInterface = () => {
                                 className={`p-2 rounded ${msg.user === 1 ? 'bg-blue-200' : 'bg-green-200'}`}
                             >
                                 <span className="font-semibold">
-                                    {msg.user === 1 ? 'Utilisateur 1' : user2Name}: {/* Affiche le nom de l'utilisateur 2 */}
+                                    {msg.user === 1 ? 'Utilisateur 1' : username}: {/* Affiche le nom de l'utilisateur 2 */}
                                 </span>
                                 <span>{msg.text}</span>
                             </div>

@@ -23,7 +23,7 @@ const router = createBrowserRouter([
     element: <CreateRoom />,
   },
   {
-    path: "/room/interface/:user2Name",
+    path: "/room/interface/:roomId",
     element: <RoomInterface />,
   },
   {
