@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRightIcon, ChevronLeftIcon } from '@heroicons/react/24/solid';
+import React from "react";
 
 export default function Home() {
   const [username, setUsername] = useState("");
@@ -33,7 +34,9 @@ export default function Home() {
       return;
     }
     setError(""); // Réinitialise l'erreur si le pseudo est valide
-    navigate(`room/create`);
+
+    // Rediriger vers room/create en passant le username dans le state
+    navigate('room/create', { state: { username } });
   };
 
   return (
