@@ -589,6 +589,14 @@ video {
   margin-top: 1rem;
 }
 
+.mt-auto {
+  margin-top: auto;
+}
+
+.mt-8 {
+  margin-top: 2rem;
+}
+
 .block {
   display: block;
 }
@@ -743,6 +751,10 @@ video {
   border-right-width: 2px;
 }
 
+.bg-opacity-75 {
+  --tw-bg-opacity: 0.75;
+}
+
 .object-cover {
   object-fit: cover;
 }
@@ -757,6 +769,14 @@ video {
 
 .p-8 {
   padding: 2rem;
+}
+
+.p-7 {
+  padding: 1.75rem;
+}
+
+.p-1 {
+  padding: 0.25rem;
 }
 
 .px-4 {
@@ -786,6 +806,11 @@ video {
 .text-sm {
   font-size: 0.875rem;
   line-height: 1.25rem;
+}
+
+.text-4xl {
+  font-size: 2.25rem;
+  line-height: 2.5rem;
 }
 
 .font-bold {
