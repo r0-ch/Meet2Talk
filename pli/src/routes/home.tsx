@@ -22,7 +22,8 @@ export default function Home() {
   };
 
   // Fonction pour supprimer un tag
-  const removeTag = (tagToRemove: string) => {
+  const removeTag = (e: any, tagToRemove: string) => {
+    e.preventDefault(); // Empêche la soumission du formulaire
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
@@ -40,7 +41,7 @@ export default function Home() {
   };
 
   return (
-    
+
     <div className="flex h-screen">
       {/* Sidebar */}
       <div className={`${isSidebarOpen ? "w-64" : "w-0"} bg-gray-800 text-white flex flex-col p-6 transition-width duration-300 overflow-hidden border-r-2 border-indigo-600`}>
@@ -54,7 +55,7 @@ export default function Home() {
               <a href="#" className="block py-2 px-4 hover:bg-gray-700 rounded">
                 About us
               </a>
-              
+
             </nav>
             <p className="block py-2 px-4 hover:bg-gray-700 rounded mt-auto">
               © PLI Inc. Tous droits réservés.
@@ -64,16 +65,20 @@ export default function Home() {
       </div>
 
       {/* Sidebar Toggle Button */}
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="bg-gray-700 text-white p-2 rounded mb-4 self-end hover:bg-gray-600 transition"
-      >
-        {isSidebarOpen ? <ChevronLeftIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
-      </button>
+      <div className="flex flex-col min-h-screen bg-gray-100">
+        <div className="flex-grow"></div> {/* Cet espace pousse le bouton vers le bas */}
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="bg-gray-700 text-white p-2 rounded mb-4 self-center hover:bg-gray-600 transition"
+        >
+          {isSidebarOpen ? <ChevronLeftIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
+        </button>
+      </div>
+
       {/* Main Content */}
       <div className="flex flex-grow items-center justify-center bg-gray-100">
         <div className="bg-white p-8 rounded shadow-lg w-96">
-      <h1 className="flex text-4xl font-bold mb-6 justify-center text-center">Welcome to Meet2Talk</h1>
+          <h1 className="flex text-4xl font-bold mb-6 justify-center text-center">Welcome to Meet2Talk</h1>
           <h1 className="text-3xl font-bold mb-6 text-center">Join a Random Room</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
@@ -120,7 +125,7 @@ export default function Home() {
                 <span key={index} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full flex items-center">
                   {tag}
                   <button
-                    onClick={() => removeTag(tag)}
+                    onClick={(e) => removeTag(e, tag)}
                     className="ml-2 text-red-500 hover:text-red-700 focus:outline-none"
                   >
                     &times;
