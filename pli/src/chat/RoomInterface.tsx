@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
 
 const RoomInterface = () => {
-    const { user2Name } = useParams<{ user2Name: string }>(); // Récupérer le nom de l'utilisateur 2
+    const { roomId } = useParams<{ roomId: string }>();
+    const location = useLocation();
+    const { username } = location.state || { username: 'You' };
     const [currentMessage, setCurrentMessage] = useState('');
     const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
-    const [profilePictures, setProfilePictures] = useState<string[]>([]); // Pour stocker les images de profil
+    const [profilePictures, setProfilePictures] = useState<string[]>([]);
+    const [isChatExpanded, setIsChatExpanded] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null); // Référence pour le défilement
 
-    // Liste de 10 images de profil
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
@@ -21,80 +24,96 @@ const RoomInterface = () => {
         "https://picsum.photos/id/306/367/267",
     ];
 
-    // Fonction pour choisir aléatoirement deux images de profil
     const getRandomProfiles = () => {
         const shuffled = [...allProfilePictures].sort(() => 0.5 - Math.random());
-        return shuffled.slice(0, 2); // Prendre les deux premières images après le mélange
+        return shuffled.slice(0, 2);
     };
 
     useEffect(() => {
-        // Récupérer les images de profil à l'initialisation
         setProfilePictures(getRandomProfiles());
     }, []);
 
-    // Fonction pour gérer l'envoi de messages
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault(); // Empêche le rechargement de la page
+        e.preventDefault();
         if (currentMessage.trim()) {
-            const user = messages.length % 2 === 0 ? 1 : 2; // Utilisateur 1 ou 2 basé sur l'index
+            const user = messages.length % 2 === 0 ? 1 : 2;
             setMessages([...messages, { text: currentMessage, user }]);
-            setCurrentMessage(''); // Réinitialise le champ de saisie
+            setCurrentMessage('');
         }
     };
 
+    // Utilise useEffect pour défiler vers le bas à chaque ajout de message
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages]);
+
     return (
-        <div className="flex flex-col items-center">
-            {/* Section des images de profil */}
-            <div className="flex justify-center space-x-4 mb-4 gap-50 mt-20 gap-[63vw]">
-                {/* Image de profil 1 */}
-                <div className="w-24 h-24 rounded-full flex items-center justify-center overflow-hidden border border-gray-500">
-                    <img
-                        src={profilePictures[0]} // Profil picture 1
-                        alt="Profile 1"
-                        className="w-full h-full object-cover"
-                    />
+        <div className="flex flex-col items-center bg-gray-50 min-h-screen py-10">
+            {/* Section des images de profil / caméras */}
+            {!isChatExpanded && (
+                <div className="flex justify-center space-x-4 gap-x-20 mb-4 w-288 bg-white p-8 border border-gray-300 rounded-lg shadow-lg">
+                    <div className="w-96 h-64 flex items-center justify-center overflow-hidden border border-gray-300 rounded-lg">
+                        <img
+                            src={profilePictures[0]}
+                            alt="Profile 1"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                    <div className="w-96 h-64 flex items-center justify-center overflow-hidden border border-gray-300 rounded-lg">
+                        <img
+                            src={profilePictures[1]}
+                            alt="Profile 2"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
                 </div>
-                {/* Image de profil 2 */}
-                <div className="w-24 h-24 rounded-full flex items-center justify-center overflow-hidden border border-gray-500">
-                    <img
-                        src={profilePictures[1]} // Profil picture 2
-                        alt="Profile 2"
-                        className="w-full h-full object-cover"
-                    />
-                </div>
-            </div>
+            )}
 
             {/* Affichage des messages */}
-            <div className="w-[80%] h-[500px] border border-gray-300 p-2 rounded-md overflow-y-auto bg-white mb-4">
+            <div
+                className={`w-288 ${isChatExpanded ? 'h-[700px]' : 'h-[500px]'} border border-gray-300 p-4 rounded-lg overflow-y-auto bg-white shadow-md relative`}
+            >
+                <div className="sticky top-0 flex justify-end z-10">
+                    <button
+                        onClick={() => setIsChatExpanded(!isChatExpanded)}
+                        className="text-gray-600 hover:text-gray-800"
+                    >
+                        {isChatExpanded ? '➖' : '➕'}
+                    </button>
+                </div>
                 {messages.length === 0 ? (
-                    <p>Aucun message</p>
+                    <p className="text-gray-600 text-center">Aucun message</p>
                 ) : (
                     messages.map((msg, index) => (
                         <div
                             key={index}
-                            className={`flex items-center mb-2 ${msg.user === 1 ? 'justify-start' : 'justify-end'}`}
+                            className={`flex items-center mb-3 ${msg.user === 1 ? 'justify-start' : 'justify-end'}`}
                         >
                             {msg.user === 1 && (
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-500 mr-2">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-300 mr-2">
                                     <img
-                                        src={profilePictures[0]} // Image de profil de l'utilisateur 1
+                                        src={profilePictures[0]}
                                         alt="Profile 1"
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
                             )}
                             <div
-                                className={`p-2 rounded ${msg.user === 1 ? 'bg-blue-200' : 'bg-green-200'}`}
+                                className={`p-3 rounded-lg max-w-md break-words text-white ${
+                                    msg.user === 1 ? 'bg-red-400' : 'bg-blue-400'
+                                }`}
                             >
-                                <span className="font-semibold">
-                                    {msg.user === 1 ? 'Utilisateur 1' : user2Name}: {/* Affiche le nom de l'utilisateur 2 */}
+                                <span className="font-semibold block mb-1">
+                                    {msg.user === 1 ? 'Anonyme' : username}:
                                 </span>
                                 <span>{msg.text}</span>
                             </div>
                             {msg.user === 2 && (
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-500 ml-2">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-300 ml-2">
                                     <img
-                                        src={profilePictures[1]} // Image de profil de l'utilisateur 2
+                                        src={profilePictures[1]}
                                         alt="Profile 2"
                                         className="w-full h-full object-cover"
                                     />
@@ -103,22 +122,26 @@ const RoomInterface = () => {
                         </div>
                     ))
                 )}
+                <div ref={messagesEndRef} /> {/* Référence pour scroller au bas */}
             </div>
 
             {/* Formulaire de saisie de message */}
-            <form onSubmit={handleSendMessage} className="mt-3 w-[80%]">
-                <input
-                    type="text"
-                    value={currentMessage}
-                    onChange={(e) => setCurrentMessage(e.target.value)}
-                    className="border border-gray-300 p-2 w-full rounded"
-                    placeholder="Écrivez un message..."
-                />
-                <button
-                    type="submit"
-                    className="mt-2 w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-                >
-                </button>
+            <form onSubmit={handleSendMessage} className="mt-4 w-288">
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={currentMessage}
+                        onChange={(e) => setCurrentMessage(e.target.value)}
+                        className="w-full p-4 pr-16 rounded-lg bg-white text-gray-700 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400 shadow"
+                        placeholder="Écrivez un message..."
+                    />
+                    <button
+                        type="submit"
+                        className="absolute right-2 top-2 bottom-2 bg-blue-400 text-white p-3 rounded-lg hover:bg-blue-500 transition"
+                    >
+                        Envoyer
+                    </button>
+                </div>
             </form>
         </div>
     );
