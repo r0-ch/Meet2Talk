@@ -8,6 +8,8 @@ import CreateRoom from './chat/CreateRoom';
 import Room from './chat/Room';
 import RoomInterface from './chat/RoomInterface';
 import Home from './routes/home';
+import Test from './chat/Test';
+import ChatRoom from './chat/ChatRoom';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -23,8 +25,10 @@ const router = createBrowserRouter([
     element: <CreateRoom />,
   },
   {
-    path: "/room/interface/:user2Name",
-    element: <RoomInterface />,
+    path: "/room/interface/:roomId",
+    // element: <RoomInterface />,
+    // element: <Test />,
+    element: <ChatRoom />,
   },
   {
     path: "/room/:id",
@@ -41,9 +45,7 @@ const router = createBrowserRouter([
 ]);
 
 root.render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>
+  <RouterProvider router={router} />
 );
 
 serviceWorkerRegistration.unregister();
