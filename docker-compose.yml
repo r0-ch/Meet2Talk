@@ -1,0 +1,38 @@
+services:
+  
+  nginx:
+    build:
+      context: ./pli
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs
+    restart: always
+    networks:
+      - main
+    #     ipv4_address: 192.168.1.10
+
+  backend:
+    build:
+      context: ./signaling
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+      - "2000-2020:2000-2020/udp"
+    volumes:
+      - ./signaling/src/app.ts:/app/src/app.ts
+    environment:
+      - CORS_ORIGIN=https://localhost:3000
+    restart: always
+    networks:
+      - main
+    #     ipv4_address: 192.168.1.20
+
+networks:
+  main:
+    driver: bridge
+    # ipam:
+    #   config:
+    #     - subnet: 192.168.1.0/24
