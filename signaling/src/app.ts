@@ -6,19 +6,19 @@ import fs from 'fs';
 import { consumers } from 'stream';
 import 'dotenv/config'
 
-// const options = {
-//     key: fs.readFileSync('/home/rosny/Etna/PLI/certs/server-key.pem', 'utf8'),
-//     cert: fs.readFileSync('/home/rosny/Etna/PLI/certs/server-cert.pem', 'utf8')
-// };
+const options = {
+    key: fs.readFileSync('/home/rosny/Etna/PLI/certs/server-key.pem', 'utf8'),
+    cert: fs.readFileSync('/home/rosny/Etna/PLI/certs/server-cert.pem', 'utf8')
+};
 
-// const httpsServer = https.createServer(options);
+const httpsServer = https.createServer(options);
 
-const httpsServer = http.createServer(
-    (req, res) => {
-        res.writeHead(200);
-        res.end('hello world\n');
-    }
-);
+// const httpsServer = http.createServer(
+//     (req, res) => {
+//         res.writeHead(200);
+//         res.end('hello world\n');
+//     }
+// );
 
 
 const io = new Server(httpsServer, {
@@ -82,8 +82,8 @@ const createWebRtcTransport = async (router: any) => {
             const webRtcTransport_options = {
                 listenIps: [
                     {
-                        ip: '0.0.0.0',
-                        announcedIp: '127.0.0.1',
+                        ip: '192.168.1.99',
+                        // announcedIp: '127.0.0.1',
                     }
                 ],
                 enableUdp: true,
