@@ -13,7 +13,13 @@ import 'dotenv/config'
 
 // const httpsServer = https.createServer(options);
 
-const httpsServer = http.createServer();
+const httpsServer = http.createServer(
+    (req, res) => {
+        res.writeHead(200);
+        res.end('hello world\n');
+    }
+);
+
 
 const io = new Server(httpsServer, {
     cors: {
@@ -28,6 +34,8 @@ const connections = io.of('/socket.io');
 
 httpsServer.listen(8000, () => {
     console.log('Server listening on port 8000');
+
+    
 }).on('error', (e) => {
     console.error(e);
 });
