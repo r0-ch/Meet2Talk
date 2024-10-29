@@ -5,7 +5,7 @@ import backgroundImage from '../img/worldwide.jpg'; // Chemin vers une image neu
 
 export default function Home() {
   const [username, setUsername] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("fr");
+  const [selectedLanguage, setSelectedLanguage] = useState(""); // État initial vide pour la langue
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [error, setError] = useState("");
@@ -37,10 +37,14 @@ export default function Home() {
       setError("Please enter a username.");
       return;
     }
+    if (selectedLanguage === "") {
+      setError("Please choose a language.");
+      return;
+    }
     setError("");
 
     const roomId = generateRoomId();
-    navigate(`/room/interface/${roomId}`, { state: { username } });
+    navigate(`/room/interface/${roomId}`, { state: { username, selectedLanguage } });
   };
 
   const toggleForm = () => {
@@ -61,7 +65,7 @@ export default function Home() {
     <div className="relative flex items-center justify-center min-h-screen">
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${backgroundImage})`, filter: 'blur(4px)' }} // Flou de l'image
+        style={{ backgroundImage: `url(${backgroundImage})`, filter: 'blur(4px)' }}
       />
       <div className="absolute inset-0 bg-black opacity-40" /> {/* Couche sombre */}
 
@@ -97,6 +101,7 @@ export default function Home() {
                 onChange={(e) => setSelectedLanguage(e.target.value)}
                 className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
               >
+                <option value="">Choose your language</option>
                 <option value="fr">Français</option>
                 <option value="en">English</option>
                 <option value="zh">中文</option>
@@ -133,8 +138,8 @@ export default function Home() {
               </div>
               <button
                 type="submit"
-                disabled={username.trim() === ""}
-                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"}`}
+                disabled={username.trim() === "" || selectedLanguage === ""}
+                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" || selectedLanguage === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"}`}
               >
                 Join Room
               </button>
