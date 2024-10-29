@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import React from "react";
-// Remplacez l'image par une image neutre ou retirez-la
 import backgroundImage from '../img/worldwide.jpg'; // Chemin vers une image neutre
 
 export default function Home() {
@@ -67,13 +66,13 @@ export default function Home() {
       <div className="absolute inset-0 bg-black opacity-40" /> {/* Couche sombre */}
 
       {showWelcomeBox && (
-        <div className="relative text-center bg-white bg-opacity-80 p-10 rounded-lg"> {/* Fond plus neutre */}
-          <h1 className="text-4xl font-bold mb-6 text-gray-800">Welcome to Meet2Talk</h1> {/* Couleur neutre */}
+        <div className="relative text-center bg-gray-900 bg-opacity-80 p-10 rounded-lg">
+          <h1 className="text-4xl font-bold mb-6 text-white">Welcome to Meet2Talk</h1>
           <button
             onClick={toggleForm}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105"
           >
-            Create Room
+            Start To Talk
           </button>
         </div>
       )}
@@ -82,7 +81,7 @@ export default function Home() {
       {showForm && (
         <div className={`fixed inset-0 flex items-center justify-center ${isAnimatingOut ? 'animate-slide-down' : 'animate-slide-up'}`}>
           <div className="bg-gray-900 bg-opacity-80 p-8 rounded-lg shadow-lg w-100">
-            <h2 className="text-2xl font-bold mb-6 text-center text-blue-500">Join a Room</h2> {/* Couleur neutre */}
+            <h2 className="text-2xl font-bold mb-6 text-center text-blue-500">Join a Room</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
@@ -140,7 +139,6 @@ export default function Home() {
                 Join Room
               </button>
             </form>
-            <button onClick={toggleForm} className="mt-4 text-gray-200 hover:underline">Cancel</button>
           </div>
         </div>
       )}
