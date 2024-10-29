@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import React from "react";
-import backgroundImage from '../img/halloween2.jpg'; // Chemin vers l'image
+// Remplacez l'image par une image neutre ou retirez-la
+import backgroundImage from '../img/worldwide.jpg'; // Chemin vers une image neutre
 
 export default function Home() {
   const [username, setUsername] = useState("");
@@ -10,7 +11,7 @@ export default function Home() {
   const [tagInput, setTagInput] = useState("");
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [showWelcomeBox, setShowWelcomeBox] = useState(true); // Nouveau état pour la boîte de bienvenue
+  const [showWelcomeBox, setShowWelcomeBox] = useState(true);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const navigate = useNavigate();
 
@@ -48,12 +49,12 @@ export default function Home() {
       setIsAnimatingOut(true);
       setTimeout(() => {
         setShowForm(false);
-        setShowWelcomeBox(true); // Afficher la boîte de bienvenue
+        setShowWelcomeBox(true);
         setIsAnimatingOut(false);
       }, 500);
     } else {
       setShowForm(true);
-      setShowWelcomeBox(false); // Cacher la boîte de bienvenue
+      setShowWelcomeBox(false);
     }
   };
 
@@ -66,11 +67,11 @@ export default function Home() {
       <div className="absolute inset-0 bg-black opacity-40" /> {/* Couche sombre */}
 
       {showWelcomeBox && (
-        <div className="relative text-center bg-black bg-opacity-60 p-10 rounded-lg"> {/* Ajout d'un fond sombre pour le texte */}
-          <h1 className="text-4xl font-bold mb-6 text-orange-400 text-shadow-md">Welcome to Meet2Talk</h1>
+        <div className="relative text-center bg-white bg-opacity-80 p-10 rounded-lg"> {/* Fond plus neutre */}
+          <h1 className="text-4xl font-bold mb-6 text-gray-800">Welcome to Meet2Talk</h1> {/* Couleur neutre */}
           <button
             onClick={toggleForm}
-            className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105"
           >
             Create Room
           </button>
@@ -80,22 +81,22 @@ export default function Home() {
       {/* Popup Form */}
       {showForm && (
         <div className={`fixed inset-0 flex items-center justify-center ${isAnimatingOut ? 'animate-slide-down' : 'animate-slide-up'}`}>
-          <div className="bg-gray-900 bg-opacity-80 p-8 rounded-lg shadow-lg w-100"> {/* Ajout de transparence */}
-            <h2 className="text-2xl font-bold mb-6 text-center text-purple-500">Join a Room</h2>
+          <div className="bg-gray-900 bg-opacity-80 p-8 rounded-lg shadow-lg w-100">
+            <h2 className="text-2xl font-bold mb-6 text-center text-blue-500">Join a Room</h2> {/* Couleur neutre */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
                 placeholder="Enter your username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg" // Opacité et ombre
+                className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
               />
 
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <select
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
+                className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
               >
                 <option value="fr">Français</option>
                 <option value="en">English</option>
@@ -109,11 +110,11 @@ export default function Home() {
                   placeholder="Add a tag"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
-                  className="flex-grow focus:outline-none px-4 py-2 focus:ring-2 focus:ring-purple-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg rounded-l" // Ajoutez `rounded-l` pour arrondir les coins gauche
+                  className="flex-grow focus:outline-none px-4 py-2 focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg rounded-l"
                 />
                 <button
                   onClick={addTag}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-r ml-2 hover:bg-purple-700 focus:outline-none" // Ajoutez `rounded-r` pour arrondir les coins droit
+                  className="bg-blue-600 text-white px-4 py-2 rounded-r ml-2 hover:bg-blue-700 focus:outline-none"
                 >
                   Add Tag
                 </button>
@@ -134,7 +135,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={username.trim() === ""}
-                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" ? "bg-gray-400 cursor-not-allowed" : "bg-purple-600 text-white hover:bg-purple-700 shadow-lg"}`}
+                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"}`}
               >
                 Join Room
               </button>
