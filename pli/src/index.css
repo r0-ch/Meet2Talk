@@ -1,6 +1,6 @@
 @font-face {
-  font-family: 'Playwrite';
-  src: url('../public/fonts/PlaywriteGBS-VariableFont_wght.ttf') format('truetype');
+  font-family: 'JosefinSans-Regular';
+  src: url('../public/fonts/JosefinSans-Regular.ttf') format('truetype');
   font-weight: normal; /* Définissez le poids si nécessaire */
   font-style: normal;
 }
@@ -11,7 +11,7 @@
 
 body {
   margin: 0;
-  font-family: 'Playwrite', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'JosefinSans-Regular', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;

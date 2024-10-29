@@ -13,6 +13,7 @@ module.exports = {
         gray: colors.gray,
         blue: colors.blue,
         indigo: colors.indigo,
+        white: colors.white,
       },
       width: {
         '112': '28rem',
@@ -62,6 +63,9 @@ module.exports = {
         md: '2px 2px 0 rgba(0, 0, 0, 0.5)',
         lg: '3px 3px 0 rgba(0, 0, 0, 0.5)',
         none: 'none',
+      },
+      boxShadow: {
+        '3xl': '0 55px 60px 15px rgba(0, 0, 0, 0.5)',
       },
     },
   },
