@@ -68,24 +68,22 @@ export default function Home() {
         style={{ backgroundImage: `url(${backgroundImage})`, filter: 'blur(4px)' }}
       />
       <div className="absolute inset-0 bg-black opacity-40" /> {/* Couche sombre */}
-
       {showWelcomeBox && (
-        <div className="relative text-center bg-gray-900 bg-opacity-80 p-10 rounded-lg">
+        <div className="relative text-center bg-gray-900 bg-opacity-80 p-10 rounded-lg shadow-3xl">
           <h1 className="text-4xl font-bold mb-6 text-white">Welcome to Meet2Talk</h1>
           <button
             onClick={toggleForm}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-transform transform hover:scale-105"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-3xl transition-transform transform hover:scale-105"
           >
             Start To Talk
           </button>
         </div>
       )}
-
       {/* Popup Form */}
       {showForm && (
         <div className={`fixed inset-0 flex items-center justify-center ${isAnimatingOut ? 'animate-slide-down' : 'animate-slide-up'}`}>
-          <div className="bg-gray-900 bg-opacity-80 p-8 rounded-lg shadow-lg w-100">
-            <h2 className="text-2xl font-bold mb-6 text-center text-blue-500">Join a Room</h2>
+          <div className="bg-gray-900 bg-opacity-80 p-8 rounded-lg shadow-3xl w-100">
+            <h2 className="text-2xl font-bold mb-6 text-center text-gray-200">Join a Room</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
@@ -107,6 +105,8 @@ export default function Home() {
                 <option value="zh">中文</option>
                 <option value="es">Español</option>
                 <option value="de">Deutsch</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
               </select>
               <div className="w-full flex items-center">
                 <input
@@ -118,7 +118,7 @@ export default function Home() {
                 />
                 <button
                   onClick={addTag}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-r ml-2 hover:bg-blue-700 focus:outline-none"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-r ml-2 hover:bg-blue-700 focus:outline-none shadow-3xl"
                 >
                   Add Tag
                 </button>
@@ -139,7 +139,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={username.trim() === "" || selectedLanguage === ""}
-                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" || selectedLanguage === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"}`}
+                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" || selectedLanguage === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700 shadow-3xl"}`}
               >
                 Join Room
               </button>
