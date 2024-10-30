@@ -575,6 +575,7 @@ const ChatRoom = () => {
     //         </div>
     //     </div>
     // );
+
     return (
         <div className="relative flex items-center justify-center h-screen bg-gray-900">
             {/* Image de fond floutée */}
@@ -587,33 +588,39 @@ const ChatRoom = () => {
             {/* Conteneur principal avec la sidebar */}
             <div className="relative z-10 flex w-[95%] h-[95vh] mx-auto p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-3xl overflow-hidden">
                 {/* Sidebar utilisateurs */}
-                {isSidebarVisible && (
-                    <div className="flex flex-col w-[10%] h-full bg-gray-700 p-4 rounded-lg shadow-lg">
-                        <h3 className="text-lg font-semibold text-gray-300 mb-4">Users in Room</h3>
-                        <ul className="space-y-2">
-                            {users.map((user, index) => (
-                                <li key={index} className="text-white">{user.username}</li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
+                <div
+                    className={`flex flex-col h-full bg-gray-700 p-4 rounded-lg shadow-lg transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : 'translate-x-[-300%]'}`}
+                    style={{ width: isSidebarVisible ? '10%' : '0%' }}
+                >
+                    <h3 className="text-lg font-semibold text-gray-300 mb-4">Users in Room</h3>
+                    <ul className="space-y-2">
+                        {users.map((user, index) => (
+                            <li key={index} className="text-white">{user.username}</li>
+                        ))}
+                    </ul>
+                </div>
+
                 {/* Contenu principal */}
-                <div className="flex flex-col w-full h-full space-y-4 bg-white-800 bg-opacity-80 overflow-hidden p-2 relative">
+                <div className={`flex flex-col ${isSidebarVisible ? 'w-[90%]' : 'w-full'} h-full space-y-4 bg-white-800 bg-opacity-80 overflow-hidden p-2 relative`}>
                     {/* Bouton pour cacher/montrer la sidebar */}
-                    <div className="absolute top-4 left-4 z-20">
+                    <div className="absolute top-4 left-4 z-20 flex items-center">
                         <button
                             onClick={() => setIsSidebarVisible(!isSidebarVisible)}
                             className="text-gray-300 bg-blue-600 px-3 py-2 rounded hover:bg-blue-700 transition"
                         >
-                            {/* Icône de menu burger */}
+                            {/* Icône de flèche */}
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6"
+                                className={`h-6 w-6 transform transition-transform duration-300`} // Ajustement de la flèche
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
                             >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                {isSidebarVisible ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 9l-5 5 5 5" /> // Flèche vers la gauche
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 15l5-5-5-5" /> // Flèche vers la droite
+                                )}
                             </svg>
                         </button>
                     </div>
@@ -679,6 +686,6 @@ const ChatRoom = () => {
             </div>
         </div>
     );
-};
+}
 
 export default ChatRoom;
