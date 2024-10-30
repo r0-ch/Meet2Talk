@@ -12,6 +12,6 @@ COPY . .
 RUN npx tsc
 
 EXPOSE 8000
-EXPOSE 2000-2020/udp
+EXPOSE 38000-38010/udp
 
 CMD ["node", "dist/app.js"]
