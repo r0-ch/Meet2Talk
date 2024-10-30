@@ -27,7 +27,7 @@ const ChatRoom = () => {
     // const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null); // Référence pour le défilement
+    const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
@@ -95,6 +95,18 @@ const ChatRoom = () => {
             setCurrentMessage('');
         }
     };
+
+    // Fonction pour scroller jusqu'au dernier message
+    const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    // Utilisation de useEffect pour scroller dès que `messages` change
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     // Leave the room
     const leaveRoom = () => {
