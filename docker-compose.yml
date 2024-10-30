@@ -12,7 +12,6 @@ services:
     # mount the certs folder to the nginx container
       - ./certs:/etc/nginx/certs
     environment:
-      - BACKEND_PROXY_PASS=${BACKEND_PROXY_PASS}
       - REACT_APP_BACKEND=${REACT_APP_BACKEND}
     restart: always
     networks:
@@ -32,8 +31,8 @@ services:
     environment:
       - CERTS_PATH=${CERTS_PATH}
       - CORS_ORIGIN=${CORS_ORIGIN}
-      - WEBRTC_TRANSPORT_IP=${WEBRTC_TRANSPORT_IP}
-      - WEBRTC_TRANSPORT_ANNOUNCED_IP=${WEBRTC_TRANSPORT_ANNOUNCED_IP}
+      - WEBRTC_LISTEN_IP=${WEBRTC_LISTEN_IP}
+      - WEBRTC_ANNOUNCED_ADDRESS=${WEBRTC_ANNOUNCED_ADDRESS}
     restart: always
     networks:
       - main
