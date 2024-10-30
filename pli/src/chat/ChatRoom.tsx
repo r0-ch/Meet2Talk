@@ -680,6 +680,14 @@ const ChatRoom = () => {
                         <div ref={messagesEndRef} /> {/* Référence pour scroll */}
                     </div>
 
+                    <div className="w-full flex justify-start mb-2 ml-2">
+                        <button
+                            className="text-gray-300 hover:text-gray-100"
+                        >
+                            Translate conversation
+                        </button>
+                    </div>
+
                     {/* Formulaire de Message */}
                     <form onSubmit={handleSendMessage} className="w-full">
                         <div className="relative">

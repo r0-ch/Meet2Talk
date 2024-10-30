@@ -18,7 +18,7 @@ const router = createBrowserRouter([
     element: <Home />,
   },
   {
-    path: "/room/interface/:roomId",
+    path: "/room/:roomId",
     element: <ChatRoom />,
   },
 ]);
