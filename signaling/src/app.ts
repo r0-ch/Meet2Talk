@@ -79,6 +79,8 @@ const createWorker = async () => {
 const createWebRtcTransport = async (router: any) => {
     return new Promise(async (resolve, reject) => {
         try {
+            console.log('ip: ', `${process.env.WEBRTC_LISTEN_IP}`);
+            console.log('announcedAddress: ', `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` ? `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` : null);
             const webRtcTransport_options = {
                 listenInfos:
                     [
