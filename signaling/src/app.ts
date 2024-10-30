@@ -61,9 +61,11 @@ const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
 ];
 
 const createWorker = async () => {
+    console.log(`WEBRTC_MIN_PORT: ${process.env.WEBRTC_MIN_PORT}`);
+    console.log(`WEBRTC_MAX_PORT: ${process.env.WEBRTC_MAX_PORT}`);
     const worker = await mediasoup.createWorker({
-        rtcMinPort: 2000,
-        rtcMaxPort: 2020,
+        rtcMinPort: process.env.WEBRTC_MIN_PORT ? parseInt(process.env.WEBRTC_MIN_PORT) : 40000,
+        rtcMaxPort: process.env.WEBRTC_MAX_PORT ? parseInt(process.env.WEBRTC_MAX_PORT) : 49999,
     });
 
     console.log('mediasoup worker created');
