@@ -15,7 +15,8 @@ services:
       - REACT_APP_BACKEND=${REACT_APP_BACKEND}
     restart: always
     networks:
-      - main
+      main: 
+        ipv4_address: 192.168.1.11
 
   backend:
     build:
@@ -35,9 +36,13 @@ services:
       - WEBRTC_ANNOUNCED_ADDRESS=${WEBRTC_ANNOUNCED_ADDRESS}
     restart: always
     networks:
-      - main
+      main: 
+        ipv4_address: 192.168.1.10
 
 # optional network configuration
 networks:
   main:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24
