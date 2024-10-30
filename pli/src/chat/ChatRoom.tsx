@@ -72,9 +72,7 @@ const ChatRoom = () => {
 
     useEffect(() => {
         const socket = io(`${process.env.REACT_APP_BACKEND}`, { 
-            path: '/socket.io',
             withCredentials: true,
-            // tryAllTransports: true,
         });
         console.log(`api: ${process.env.REACT_APP_BACKEND}`);
         socketRef.current = socket;
