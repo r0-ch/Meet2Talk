@@ -585,14 +585,13 @@ const ChatRoom = () => {
             />
             <div className="absolute inset-0 bg-black opacity-60" /> {/* Couche sombre */}
 
-            {/* Conteneur principal avec la sidebar */}
             <div className="relative z-10 flex w-[95%] h-[95vh] mx-auto p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-3xl overflow-hidden">
                 {/* Sidebar utilisateurs */}
                 <div
-                    className={`flex flex-col h-full bg-gray-700 p-4 rounded-lg shadow-lg transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : 'translate-x-[-300%]'}`}
+                    className={`flex flex-col h-full bg-gray-700 p-4 rounded-lg shadow-lg transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : 'translate-x-[-2000%]'}`}
                     style={{ width: isSidebarVisible ? '10%' : '0%' }}
                 >
-                    <h3 className="text-lg font-semibold text-gray-300 mb-4">Users in Room</h3>
+                    <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
                     <ul className="space-y-2">
                         {users.map((user, index) => (
                             <li key={index} className="text-white">{user.username}</li>
@@ -606,7 +605,7 @@ const ChatRoom = () => {
                     <div className="absolute top-4 left-4 z-20 flex items-center">
                         <button
                             onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-                            className="text-gray-300 bg-blue-600 px-3 py-2 rounded hover:bg-blue-700 transition"
+                            className="text-gray-300 bg-blue-500 px-3 py-2 rounded hover:bg-blue-600 transition"
                         >
                             {/* Icône de flèche */}
                             <svg
