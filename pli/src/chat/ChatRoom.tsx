@@ -26,7 +26,9 @@ const ChatRoom = () => {
     const [currentMessage, setCurrentMessage] = useState('');
     // const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
+    const [users, setUsers] = useState<{ username: string }[]>([]);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
+    const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
@@ -89,12 +91,15 @@ const ChatRoom = () => {
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (currentMessage.trim()) {
-            // const user = messages.length % 2 === 0 ? 1 : 2;
-            // setMessages([...messages, { message: currentMessage, username: user, translated: null }]);
             sendMessage(currentMessage);
-            setCurrentMessage('');
         }
     };
+    // Permet de mettre à jour la liste des utilisateurs
+    useEffect(() => {
+        if (!users.some(user => user.username === username)) {
+            setUsers((prevUsers) => [...prevUsers, { username }]);
+        }
+    }, [username]);
 
     // Fonction pour scroller jusqu'au dernier message
     const scrollToBottom = () => {
@@ -537,10 +542,7 @@ const ChatRoom = () => {
 
             handleRemotePeer(peer);
         });
-
-
     };
-
 
 
     // return (
@@ -581,68 +583,101 @@ const ChatRoom = () => {
             />
             <div className="absolute inset-0 bg-black opacity-60" /> {/* Couche sombre */}
 
-            {/* Contenu principal avec 95% de la hauteur de la page */}
-            <div className="relative z-10 flex flex-col items-center w-[95%] h-[95vh] mx-auto p-6 space-y-4 bg-gray-800 bg-opacity-80 rounded-lg shadow-3xl overflow-hidden">
-                {/* Section des Vidéos */}
-                {!isChatExpanded && (
-                    <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
-                        <video autoPlay controls id="localVideo" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
+            {/* Conteneur principal avec la sidebar */}
+            <div className="relative z-10 flex w-[95%] h-[95vh] mx-auto p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-3xl overflow-hidden">
+                {/* Sidebar utilisateurs */}
+                {isSidebarVisible && (
+                    <div className="flex flex-col w-[10%] h-full bg-gray-700 p-4 rounded-lg shadow-lg">
+                        <h3 className="text-lg font-semibold text-gray-300 mb-4">Users in Room</h3>
+                        <ul className="space-y-2">
+                            {users.map((user, index) => (
+                                <li key={index} className="text-white">{user.username}</li>
+                            ))}
+                        </ul>
                     </div>
                 )}
+                {/* Contenu principal */}
+                <div className="flex flex-col w-full h-full space-y-4 bg-white-800 bg-opacity-80 overflow-hidden p-2 relative">
+                    {/* Bouton pour cacher/montrer la sidebar */}
+                    <div className="absolute top-4 left-4 z-20">
+                        <button
+                            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                            className="text-gray-300 bg-blue-600 px-3 py-2 rounded hover:bg-blue-700 transition"
+                        >
+                            {/* Icône de menu burger */}
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
 
-                {/* Boîte des Messages */}
-                <div className={`w-full ${isChatExpanded ? 'h-[95%]' : 'h-[95%]'} p-4 rounded-lg overflow-y-auto relative`}>
-                    <div className="flex justify-end mb-2">
+                    {/* Section des Vidéos */}
+                    {!isChatExpanded && (
+                        <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
+                            <video autoPlay controls id="localVideo" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
+                        </div>
+                    )}
+
+                    {/* Section chat expand/minimize */}
+                    <div className="w-full flex justify-end mb-2">
                         <button
                             onClick={() => setIsChatExpanded(!isChatExpanded)}
                             className="text-gray-300 hover:text-gray-100"
                         >
-                            {isChatExpanded ? 'Minimize' : 'Expend'}
+                            {isChatExpanded ? 'Minimize' : 'Expand'}
                         </button>
                     </div>
 
-                    {messages.length === 0 ? (
-                        <p className="text-gray-300 text-center">No message</p>
-                    ) : (
-                        messages.map((msg, index) => (
-                            <div
-                                key={index}
-                                className={`flex items-center mb-3 ${msg.username === "Anonyme" ? 'justify-start' : 'justify-end'}`}
-                            >
+                    {/* Boîte des Messages */}
+                    <div className={`w-full ${isChatExpanded ? 'h-[95%]' : 'h-[95%]'} p-4 rounded-lg overflow-y-auto relative`}>
+                        {messages.length === 0 ? (
+                            <p className="text-gray-300 text-center">No message</p>
+                        ) : (
+                            messages.map((msg, index) => (
                                 <div
-                                    className={`p-3 rounded-lg max-w-md break-words ${msg.username === "Anonyme" ? 'bg-blue-700' : 'bg-gray-700'} text-gray-200`}
+                                    key={index}
+                                    className={`flex items-center mb-3 ${msg.username === "Anonyme" ? 'justify-start' : 'justify-end'}`}
                                 >
-                                    <span className="font-semibold block mb-1">{msg.username}:</span>
-                                    <span>{msg.message}</span>
+                                    <div
+                                        className={`p-3 rounded-lg max-w-md break-words ${msg.username === "Anonyme" ? 'bg-gray-700' : 'bg-gray-700'} text-gray-200`}
+                                    >
+                                        <span className="font-semibold block mb-1">{msg.username}:</span>
+                                        <span>{msg.message}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        ))
-                    )}
-                    <div ref={messagesEndRef} /> {/* Référence pour scroll */}
-                </div>
-
-                {/* Formulaire de Message */}
-                <form onSubmit={handleSendMessage} className="w-full">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={currentMessage}
-                            onChange={(e) => setCurrentMessage(e.target.value)}
-                            className="w-full p-3 rounded-lg bg-gray-700 text-gray-200 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 shadow"
-                            placeholder="Write a message..."
-                        />
-                        <button
-                            type="submit"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition"
-                        >
-                            Send
-                        </button>
+                            ))
+                        )}
+                        <div ref={messagesEndRef} /> {/* Référence pour scroll */}
                     </div>
-                </form>
 
+                    {/* Formulaire de Message */}
+                    <form onSubmit={handleSendMessage} className="w-full">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={currentMessage}
+                                onChange={(e) => setCurrentMessage(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-gray-700 text-gray-200 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 shadow"
+                                placeholder="Write a message..."
+                            />
+                            <button
+                                type="submit"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition"
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );
-}
+};
 
 export default ChatRoom;
