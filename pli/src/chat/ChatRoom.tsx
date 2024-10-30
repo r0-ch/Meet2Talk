@@ -18,7 +18,7 @@ const ChatRoom = () => {
     const [remotePeers, setRemotePeers] = useState<any>([]);
     const [remoteVideoElements, setRemoteVideoElements] = useState<HTMLElement[]>([]);
     const [remoteTrackGroups, setRemoteTrackGroups] = useState<any>([]);
-    const [messages, setMessages] = useState<{ username: string, message: string, translated: string | null }[]>([]);
+    const [messages, setMessages] = useState<{ socketId: string, username: string, message: string, translated: string | null }[]>([]);
     const roomJoinedRef = useRef<boolean>(false);
     // const { roomId } = useParams<{ roomId: string }>();
     const location = useLocation();
@@ -66,7 +66,7 @@ const ChatRoom = () => {
     };
 
     useEffect(() => {
-        const socket = io(`${process.env.REACT_APP_BACKEND}`, { 
+        const socket = io(`${process.env.REACT_APP_BACKEND}`, {
             withCredentials: true,
         });
         console.log(`api: ${process.env.REACT_APP_BACKEND}`);
@@ -411,6 +411,8 @@ const ChatRoom = () => {
                 console.log('Consumer: ', consumer);
                 tracks.push(consumer.track);
                 console.log('Tracks: ', tracks);
+
+                console.log('Peer: ', peer);
             }
 
             if (producer.dataProducer) {
@@ -491,6 +493,7 @@ const ChatRoom = () => {
 
     const sendMessage = (message: string) => {
         const data = {
+            socketId: localSocketIdRef.current,
             username,
             message,
             translated: null
@@ -626,6 +629,22 @@ const ChatRoom = () => {
                     {!isChatExpanded && (
                         <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
                             <video autoPlay controls id="localVideo" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
+
+                            {remoteTrackGroups && remoteTrackGroups.map((trackGroup: any, index: number) => {
+                                const mediaStream = new MediaStream();
+                                trackGroup.tracks.forEach((track: MediaStreamTrack) => {
+                                    mediaStream.addTrack(track);
+                                });
+
+                                return (
+                                    <video className="w-[25%] h-[100%] border border-gray-600 rounded-md" 
+                                        key={index} ref={video => { 
+                                            if (video) { video.srcObject = mediaStream; video.dataset.socketId = trackGroup.socketId; } 
+                                        }} autoPlay controls>
+                                    </video>
+                                );
+
+                            })}
                         </div>
                     )}
 
@@ -644,13 +663,13 @@ const ChatRoom = () => {
                         {messages.length === 0 ? (
                             <p className="text-gray-300 text-center">No message</p>
                         ) : (
-                            messages.map((msg, index) => (
+                            messages.map((msg: any, index) => (
                                 <div
                                     key={index}
-                                    className={`flex items-center mb-3 ${msg.username != username ? 'justify-start' : 'justify-end'}`}
+                                    className={`flex items-center mb-3 ${msg.socketId != localSocketIdRef.current ? 'justify-start' : 'justify-end'}`}
                                 >
                                     <div
-                                        className={`p-3 rounded-lg max-w-md break-words ${msg.username != username ? 'bg-gray-700' : 'bg-gray-700'} text-gray-200`}
+                                        className={`p-3 rounded-lg max-w-md break-words ${msg.socketId != localSocketIdRef.current ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
                                     >
                                         <span className="font-semibold block mb-1">{msg.username}:</span>
                                         <span>{msg.message}</span>
@@ -659,6 +678,14 @@ const ChatRoom = () => {
                             ))
                         )}
                         <div ref={messagesEndRef} /> {/* Référence pour scroll */}
+                    </div>
+
+                    <div className="w-full flex justify-start mb-2 ml-2">
+                        <button
+                            className="text-gray-300 hover:text-gray-100"
+                        >
+                            Translate conversation
+                        </button>
                     </div>
 
                     {/* Formulaire de Message */}
