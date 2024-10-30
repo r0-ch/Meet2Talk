@@ -2,13 +2,11 @@ import { io, Socket } from "socket.io-client";
 import mediasoup, { Device } from "mediasoup-client";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
-
+import backgroundImage from '../img/worldwide.jpg'; // Chemin vers l'image
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest' } = useLocation().state as { username: string } || {};
-
-
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const rtpCapabilitiesRef = useRef<mediasoup.types.RtpCapabilities | null>(null);
@@ -17,24 +15,21 @@ const ChatRoom = () => {
     const localVideoProducerRef = useRef<mediasoup.types.Producer | null>(null);
     const localAudioProducerRef = useRef<mediasoup.types.Producer | null>(null);
     const localDataProducerRef = useRef<mediasoup.types.DataProducer | null>(null);
-
     const [remotePeers, setRemotePeers] = useState<any>([]);
     const [remoteVideoElements, setRemoteVideoElements] = useState<HTMLElement[]>([]);
     const [remoteTrackGroups, setRemoteTrackGroups] = useState<any>([]);
-    const [messages, setMessages] = useState<{username: string, message: string, translated: string | null}[]>([]);
-
+    const [messages, setMessages] = useState<{ username: string, message: string, translated: string | null }[]>([]);
     const roomJoinedRef = useRef<boolean>(false);
-
-
     // const { roomId } = useParams<{ roomId: string }>();
     const location = useLocation();
     // const { username } = location.state || { username: 'You' };
     const [currentMessage, setCurrentMessage] = useState('');
     // const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
+    const [users, setUsers] = useState<{ username: string }[]>([]);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null); // Référence pour le défilement
-
+    const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
+    const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
@@ -94,12 +89,28 @@ const ChatRoom = () => {
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (currentMessage.trim()) {
-            // const user = messages.length % 2 === 0 ? 1 : 2;
-            // setMessages([...messages, { message: currentMessage, username: user, translated: null }]);
             sendMessage(currentMessage);
-            setCurrentMessage('');
+        }
+        setCurrentMessage('');
+    };
+    // Permet de mettre à jour la liste des utilisateurs
+    useEffect(() => {
+        if (!users.some(user => user.username === username)) {
+            setUsers((prevUsers) => [...prevUsers, { username }]);
+        }
+    }, [username]);
+
+    // Fonction pour scroller jusqu'au dernier message
+    const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     };
+
+    // Utilisation de useEffect pour scroller dès que `messages` change
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     // Leave the room
     const leaveRoom = () => {
@@ -182,17 +193,17 @@ const ChatRoom = () => {
                     socketRef.current?.emit('transport-connect', { roomId, dtlsParameters, direction: 'send', transportId: data.id });
                     callback();
                 });
-        
+
                 localProducerTransportRef.current?.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
                     console.log('Produce event');
 
-                    try{
+                    try {
                         socketRef.current?.emit('transport-produce', {
                             roomId,
                             transportId: localProducerTransportRef.current?.id,
-                            kind, 
+                            kind,
                             rtpParameters,
-                            appData 
+                            appData
                         }, ({ id }: any) => {
                             console.log('Produce: ', id);
                             callback({ id });
@@ -262,7 +273,7 @@ const ChatRoom = () => {
             //     label: 'chat',
             //     protocol: 'chat'
             // }) || null;
-    
+
             const localDataProducer = new Promise<any>((resolve) => {
                 const dataProducer = localProducerTransportRef.current?.produceData({
                     ordered: true,
@@ -273,38 +284,38 @@ const ChatRoom = () => {
             });
 
             localDataProducerRef.current = await localDataProducer;
-            
+
             console.log('Local data producer: ', localDataProducerRef.current);
-    
+
             localDataProducerRef.current?.on('transportclose', () => {
                 console.log('Data producer transport close');
             });
-    
+
             localDataProducerRef.current?.on('close', () => {
                 console.log('Data producer close');
             });
-    
+
             localDataProducerRef.current?.on('bufferedamountlow', () => {
                 console.log('Data producer buffered amount low');
             });
-    
+
             localDataProducerRef.current?.on('error', (error) => {
                 console.error('Data producer error: ', error);
             });
-    
+
             localDataProducerRef.current?.on('open', () => {
                 console.log('Data producer open');
             });
-    
+
             localDataProducerRef.current?.on('close', () => {
                 console.log('Data producer close');
             });
-    
+
             localDataProducerRef.current?.send('Hello');
         } catch (error) {
             console.error('Produce data error: ', error);
         }
-        
+
     }
 
     const createReceiveTransport = async () => {
@@ -319,17 +330,17 @@ const ChatRoom = () => {
                     callback();
                 });
 
-                resolve({consumerTransport, serverReceiveTransportId: data.id});
+                resolve({ consumerTransport, serverReceiveTransportId: data.id });
             });
         });
     };
 
     const createConsumer = async (consumerTransport: any, producer: any, serverReceiveTransportId: any) => {
         return new Promise<any>((resolve) => {
-            socketRef.current?.emit('transport-consume', { 
-                roomId, 
+            socketRef.current?.emit('transport-consume', {
+                roomId,
                 producerId: producer.id,
-                rtpCapabilities: localDeviceRef.current?.rtpCapabilities, 
+                rtpCapabilities: localDeviceRef.current?.rtpCapabilities,
                 transportId: serverReceiveTransportId
             }, async (data: any) => {
                 console.log('Consume: ', data);
@@ -343,17 +354,17 @@ const ChatRoom = () => {
 
                 console.log('Consumer: ', consumer);
 
-                resolve({consumer, id: data.id});
+                resolve({ consumer, id: data.id });
             });
         });
     };
 
     const createDataConsumer = async (consumerTransport: any, producer: any, serverReceiveTransportId: any) => {
         return new Promise<any>((resolve) => {
-            socketRef.current?.emit('transport-consume-data', { 
-                roomId, 
+            socketRef.current?.emit('transport-consume-data', {
+                roomId,
                 dataProducerId: producer.id,
-                rtpCapabilities: localDeviceRef.current?.rtpCapabilities, 
+                rtpCapabilities: localDeviceRef.current?.rtpCapabilities,
                 transportId: serverReceiveTransportId
             }, async (data: any) => {
                 console.log('Consume data: ', data);
@@ -381,7 +392,7 @@ const ChatRoom = () => {
 
                 console.log('Consumer: ', consumer);
 
-                resolve({consumer, id: data.id});
+                resolve({ consumer, id: data.id });
             });
         });
     };
@@ -395,13 +406,13 @@ const ChatRoom = () => {
         const tracks: MediaStreamTrack[] = [];
         for (const producer of peer.producers) {
             if (producer.kind === 'audio' || producer.kind === 'video') {
-                const {consumer, id} = await createConsumer(consumerTransport, producer, serverReceiveTransportId);
+                const { consumer, id } = await createConsumer(consumerTransport, producer, serverReceiveTransportId);
                 serverConsumerId = id;
                 console.log('Consumer: ', consumer);
                 tracks.push(consumer.track);
                 console.log('Tracks: ', tracks);
             }
-            
+
             if (producer.dataProducer) {
                 await createDataConsumer(consumerTransport, producer, serverReceiveTransportId);
             }
@@ -415,7 +426,7 @@ const ChatRoom = () => {
         // });
         // console.log('mediaStream: ', mediaStream);
         // remoteVideoElement.srcObject = mediaStream;
-        
+
         // setRemoteVideoElements((prevElements: any) => {
         //     const updatedElements = [...prevElements, remoteVideoElement];
         //     console.log('Remote video elements: ', updatedElements);
@@ -423,7 +434,7 @@ const ChatRoom = () => {
         // });
 
         setRemoteTrackGroups((prevTrackGroups: any) => {
-            const updatedTrackGroups = [...prevTrackGroups, {socketId: peer.socketId, tracks}];
+            const updatedTrackGroups = [...prevTrackGroups, { socketId: peer.socketId, tracks }];
             console.log('Remote track groups: ', updatedTrackGroups);
             return updatedTrackGroups;
         });
@@ -441,7 +452,7 @@ const ChatRoom = () => {
                 console.log('Joined room: ', roomId);
                 rtpCapabilitiesRef.current = data.rtpCapabilities;
                 console.log('RTP Capabilities: ', rtpCapabilitiesRef.current);
-    
+
                 roomJoinedRef.current = true;
 
                 // setRemotePeers((prevPeers: any) => {
@@ -502,7 +513,7 @@ const ChatRoom = () => {
             localSocketIdRef.current = socketId;
         });
 
-        const {peers} = await joinRoom();
+        const { peers } = await joinRoom();
         await handleLocalStream(await getLocalStream());
         await createDevice();
         await createSendTransport();
@@ -530,11 +541,8 @@ const ChatRoom = () => {
 
             handleRemotePeer(peer);
         });
-        
-       
     };
 
-    
 
     // return (
     //     <div>
@@ -547,7 +555,7 @@ const ChatRoom = () => {
     //                 trackGroup.tracks.forEach((track: MediaStreamTrack) => {
     //                     mediaStream.addTrack(track);
     //                 });
-                    
+
     //                 return (
     //                     <video key={index} ref={video => { if (video) { video.srcObject = mediaStream; video.dataset.socketId = trackGroup.socketId; } }} autoPlay controls></video>
     //                 );
@@ -565,115 +573,110 @@ const ChatRoom = () => {
     //         </div>
     //     </div>
     // );
-
     return (
-        <div className="flex flex-col items-center bg-gray-50 min-h-screen py-10">
-            {/* Section des images de profil / caméras */}
-            {!isChatExpanded && (
-                <div className="flex justify-center space-x-4 gap-x-20 mb-4 w-288 bg-white p-8 border border-gray-300 rounded-lg shadow-lg">
-                    <video autoPlay controls id="localVideo" className="w-96 h-64 flex items-center justify-center overflow-hidden border border-gray-300 rounded-lg" >
-                        {/* <img
-                            src={profilePictures[0]}
-                            alt="Profile 1"
-                            className="w-full h-full object-cover"
-                        /> */}
-                    </video>
-                    
-                    {remoteTrackGroups && remoteTrackGroups.map((trackGroup: any, index: number) => {
-                        const mediaStream = new MediaStream();
-                        trackGroup.tracks.forEach((track: MediaStreamTrack) => {
-                            mediaStream.addTrack(track);
-                        });
-                        
-                        return (
-                            <video key={index} ref={video => { if (video) { video.srcObject = mediaStream; video.dataset.socketId = trackGroup.socketId; } }} autoPlay controls className="w-96 h-64 flex items-center justify-center overflow-hidden border border-gray-300 rounded-lg"></video>
-                        );
-
-                    })}
-                    {/* <div className="w-96 h-64 flex items-center justify-center overflow-hidden border border-gray-300 rounded-lg">
-                        <img
-                            src={profilePictures[1]}
-                            alt="Profile 2"
-                            className="w-full h-full object-cover"
-                        />
-                    </div> */}
-                </div>
-            )}
-
-            {/* Affichage des messages */}
+        <div className="relative flex items-center justify-center h-screen bg-gray-900">
+            {/* Image de fond floutée */}
             <div
-                className={`w-288 ${isChatExpanded ? 'h-[700px]' : 'h-[500px]'} border border-gray-300 p-4 rounded-lg overflow-y-auto bg-white shadow-md relative`}
-            >
-                <div className="sticky top-0 flex justify-end z-10">
-                    <button
-                        onClick={() => setIsChatExpanded(!isChatExpanded)}
-                        className="text-gray-600 hover:text-gray-800"
-                    >
-                        {isChatExpanded ? '➖' : '➕'}
-                    </button>
-                </div>
-                {messages.length === 0 ? (
-                    <p className="text-gray-600 text-center">Aucun message</p>
-                ) : (
-                    messages.map((msg, index) => (
-                        <div
-                            key={index}
-                            className={`flex items-center mb-3 ${msg.username === username ? 'justify-start' : 'justify-end'}`}
-                        >
-                            {msg.username === username && (
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-300 mr-2">
-                                    <img
-                                        src={profilePictures[0]}
-                                        alt="Profile 1"
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            )}
-                            <div
-                                className={`p-3 rounded-lg max-w-md break-words text-white ${
-                                    msg.username === username ? 'bg-red-400' : 'bg-blue-400'
-                                }`}
-                            >
-                                <span className="font-semibold block mb-1">
-                                    {msg.username === username ? 'Anonyme' : username}:
-                                </span>
-                                <span>{msg.message}</span>
-                            </div>
-                            {msg.username !== username && (
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden border border-gray-300 ml-2">
-                                    <img
-                                        src={profilePictures[1]}
-                                        alt="Profile 2"
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ))
-                )}
-                <div ref={messagesEndRef} /> {/* Référence pour scroller au bas */}
-            </div>
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${backgroundImage})`, filter: 'blur(6px)' }}
+            />
+            <div className="absolute inset-0 bg-black opacity-60" /> {/* Couche sombre */}
 
-            {/* Formulaire de saisie de message */}
-            <form onSubmit={handleSendMessage} className="mt-4 w-288">
-                <div className="relative">
-                    <input
-                        type="text"
-                        value={currentMessage}
-                        onChange={(e) => setCurrentMessage(e.target.value)}
-                        className="w-full p-4 pr-16 rounded-lg bg-white text-gray-700 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 placeholder-gray-400 shadow"
-                        placeholder="Écrivez un message..."
-                    />
-                    <button
-                        type="submit"
-                        className="absolute right-2 top-2 bottom-2 bg-blue-400 text-white p-3 rounded-lg hover:bg-blue-500 transition"
-                    >
-                        Envoyer
-                    </button>
+            {/* Conteneur principal avec la sidebar */}
+            <div className="relative z-10 flex w-[95%] h-[95vh] mx-auto p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-3xl overflow-hidden">
+                {/* Sidebar utilisateurs */}
+                {isSidebarVisible && (
+                    <div className="flex flex-col w-[10%] h-full bg-gray-700 p-4 rounded-lg shadow-lg">
+                        <h3 className="text-lg font-semibold text-gray-300 mb-4">Users in Room</h3>
+                        <ul className="space-y-2">
+                            {users.map((user, index) => (
+                                <li key={index} className="text-white">{user.username}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                {/* Contenu principal */}
+                <div className="flex flex-col w-full h-full space-y-4 bg-white-800 bg-opacity-80 overflow-hidden p-2 relative">
+                    {/* Bouton pour cacher/montrer la sidebar */}
+                    <div className="absolute top-4 left-4 z-20">
+                        <button
+                            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                            className="text-gray-300 bg-blue-600 px-3 py-2 rounded hover:bg-blue-700 transition"
+                        >
+                            {/* Icône de menu burger */}
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Section des Vidéos */}
+                    {!isChatExpanded && (
+                        <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
+                            <video autoPlay controls id="localVideo" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
+                        </div>
+                    )}
+
+                    {/* Section chat expand/minimize */}
+                    <div className="w-full flex justify-end mb-2">
+                        <button
+                            onClick={() => setIsChatExpanded(!isChatExpanded)}
+                            className="text-gray-300 hover:text-gray-100"
+                        >
+                            {isChatExpanded ? 'Minimize' : 'Expand'}
+                        </button>
+                    </div>
+
+                    {/* Boîte des Messages */}
+                    <div className={`w-full ${isChatExpanded ? 'h-[95%]' : 'h-[95%]'} p-4 rounded-lg overflow-y-auto relative`}>
+                        {messages.length === 0 ? (
+                            <p className="text-gray-300 text-center">No message</p>
+                        ) : (
+                            messages.map((msg, index) => (
+                                <div
+                                    key={index}
+                                    className={`flex items-center mb-3 ${msg.username === "Anonyme" ? 'justify-start' : 'justify-end'}`}
+                                >
+                                    <div
+                                        className={`p-3 rounded-lg max-w-md break-words ${msg.username === "Anonyme" ? 'bg-gray-700' : 'bg-gray-700'} text-gray-200`}
+                                    >
+                                        <span className="font-semibold block mb-1">{msg.username}:</span>
+                                        <span>{msg.message}</span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                        <div ref={messagesEndRef} /> {/* Référence pour scroll */}
+                    </div>
+
+                    {/* Formulaire de Message */}
+                    <form onSubmit={handleSendMessage} className="w-full">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={currentMessage}
+                                onChange={(e) => setCurrentMessage(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-gray-700 text-gray-200 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 shadow"
+                                placeholder="Write a message..."
+                            />
+                            <button
+                                type="submit"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition"
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     );
-}
+};
 
 export default ChatRoom;
