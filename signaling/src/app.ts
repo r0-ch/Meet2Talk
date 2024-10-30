@@ -85,12 +85,12 @@ const createWebRtcTransport = async (router: any) => {
                         {
                             protocol: "udp",
                             ip: `${process.env.WEBRTC_LISTEN_IP}`,
-                            announcedAddress: `${process.env.WEBRTC_ANNOUNCED_ADDRESS}`,
+                            announcedAddress: `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` ? `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` : null,
                         },
                         {
                             protocol: "tcp",
                             ip: `${process.env.WEBRTC_LISTEN_IP}`,
-                            announcedAddress: `${process.env.WEBRTC_ANNOUNCED_ADDRESS}`,
+                            announcedAddress: `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` ? `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` : null,
                         }
                     ],
                     
