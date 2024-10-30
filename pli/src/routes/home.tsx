@@ -44,7 +44,7 @@ export default function Home() {
     setError("");
 
     const roomId = generateRoomId();
-    navigate(`/room/interface/${roomId}`, { state: { username, selectedLanguage } });
+    navigate(`/room/${roomId}`, { state: { username, selectedLanguage } });
   };
 
   const toggleForm = () => {
