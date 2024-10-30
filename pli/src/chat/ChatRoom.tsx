@@ -93,6 +93,7 @@ const ChatRoom = () => {
         if (currentMessage.trim()) {
             sendMessage(currentMessage);
         }
+        setCurrentMessage('');
     };
     // Permet de mettre à jour la liste des utilisateurs
     useEffect(() => {
