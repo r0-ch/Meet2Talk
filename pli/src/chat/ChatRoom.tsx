@@ -647,10 +647,10 @@ const ChatRoom = () => {
                             messages.map((msg, index) => (
                                 <div
                                     key={index}
-                                    className={`flex items-center mb-3 ${msg.username === "Anonyme" ? 'justify-start' : 'justify-end'}`}
+                                    className={`flex items-center mb-3 ${msg.username != username ? 'justify-start' : 'justify-end'}`}
                                 >
                                     <div
-                                        className={`p-3 rounded-lg max-w-md break-words ${msg.username === "Anonyme" ? 'bg-gray-700' : 'bg-gray-700'} text-gray-200`}
+                                        className={`p-3 rounded-lg max-w-md break-words ${msg.username != username ? 'bg-gray-700' : 'bg-gray-700'} text-gray-200`}
                                     >
                                         <span className="font-semibold block mb-1">{msg.username}:</span>
                                         <span>{msg.message}</span>
