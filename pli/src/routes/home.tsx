@@ -114,6 +114,7 @@ export default function Home() {
                   type="text"
                   placeholder="Add a tag"
                   value={tagInput}
+                  maxLength={15}
                   onChange={(e) => setTagInput(e.target.value)}
                   className="flex-grow focus:outline-none px-4 py-2 focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg rounded-l"
                 />
