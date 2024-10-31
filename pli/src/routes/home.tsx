@@ -89,6 +89,7 @@ export default function Home() {
                 type="text"
                 placeholder="Enter your username"
                 value={username}
+                maxLength={15}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
               />
