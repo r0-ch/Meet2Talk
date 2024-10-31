@@ -3,10 +3,11 @@ import mediasoup, { Device } from "mediasoup-client";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import backgroundImage from '../img/worldwide.jpg'; // Chemin vers l'image
+import { enable } from "workbox-navigation-preload";
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
-    const { username = 'Guest' } = useLocation().state as { username: string } || {};
+    const { username = 'Guest', selectedLanguage =  "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const rtpCapabilitiesRef = useRef<mediasoup.types.RtpCapabilities | null>(null);
@@ -26,6 +27,7 @@ const ChatRoom = () => {
     const [currentMessage, setCurrentMessage] = useState('');
     // const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
+    const [translationEnabled, setTranslationEnabled] = useState(false);
     const [users, setUsers] = useState<{ username: string }[]>([]);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
@@ -85,6 +87,45 @@ const ChatRoom = () => {
             leaveRoom();
         };
     }, []);
+
+
+    async function translate(text: string, target: string = "en") {
+        return new Promise<string>(async(resolve, reject) => {
+            try {
+                const res = await fetch("https://plx.ketsuna.com/translate", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        q: text,
+                        source: "auto",
+                        target: target,
+                        format: "text",
+                        alternatives: 3,
+                        api_key: ""
+                    }),
+                    headers: { "Content-Type": "application/json" }
+                })
+                const data = await res.json();
+                resolve(data.translatedText);
+            } catch (error) {
+                reject("Error translating text");
+            }
+        });
+    }
+
+
+    async function enableTranslation() {
+        setTranslationEnabled(!translationEnabled);
+        // we retrieve all messages and translate them
+        const translatedMessages = await Promise.all(messages.map(async (msg) => {
+            if (msg.translated || msg.username === username) {
+                return msg;
+            }
+            const translated = await translate(msg.message, selectedLanguage);
+            return { ...msg, translated };
+        }));
+
+        setMessages(translatedMessages);
+    }
 
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -637,9 +678,9 @@ const ChatRoom = () => {
                                 });
 
                                 return (
-                                    <video className="w-[25%] h-[100%] border border-gray-600 rounded-md" 
-                                        key={index} ref={video => { 
-                                            if (video) { video.srcObject = mediaStream; video.dataset.socketId = trackGroup.socketId; } 
+                                    <video className="w-[25%] h-[100%] border border-gray-600 rounded-md"
+                                        key={index} ref={video => {
+                                            if (video) { video.srcObject = mediaStream; video.dataset.socketId = trackGroup.socketId; }
                                         }} autoPlay controls>
                                     </video>
                                 );
@@ -663,7 +704,7 @@ const ChatRoom = () => {
                         {messages.length === 0 ? (
                             <p className="text-gray-300 text-center">No message</p>
                         ) : (
-                            messages.map((msg: any, index) => (
+                            messages.map((msg, index) => (
                                 <div
                                     key={index}
                                     className={`flex items-center mb-3 ${msg.socketId != localSocketIdRef.current ? 'justify-start' : 'justify-end'}`}
@@ -672,7 +713,7 @@ const ChatRoom = () => {
                                         className={`p-3 rounded-lg max-w-md break-words ${msg.socketId != localSocketIdRef.current ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
                                     >
                                         <span className="font-semibold block mb-1">{msg.username}:</span>
-                                        <span>{msg.message}</span>
+                                        <span>{translationEnabled && msg.translated ? msg.translated : msg.message}</span>
                                     </div>
                                 </div>
                             ))
@@ -682,9 +723,10 @@ const ChatRoom = () => {
 
                     <div className="w-full flex justify-start mb-2 ml-2">
                         <button
+                            onClick={async() => await enableTranslation()}
                             className="text-gray-300 hover:text-gray-100"
                         >
-                            Translate conversation
+                            {translationEnabled ? 'Original conversation' : 'Translate conversation'}
                         </button>
                     </div>
 
