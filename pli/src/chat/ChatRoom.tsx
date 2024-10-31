@@ -1,21 +1,13 @@
 import { io, Socket } from "socket.io-client";
-import mediasoup, { Device } from "mediasoup-client";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import backgroundImage from '../img/worldwide.jpg'; // Chemin vers l'image
-import { enable } from "workbox-navigation-preload";
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
-    const rtpCapabilitiesRef = useRef<mediasoup.types.RtpCapabilities | null>(null);
-    const localDeviceRef = useRef<Device | null>(null);
-    const localProducerTransportRef = useRef<mediasoup.types.Transport | null>(null);
-    const localVideoProducerRef = useRef<mediasoup.types.Producer | null>(null);
-    const localAudioProducerRef = useRef<mediasoup.types.Producer | null>(null);
-    const localDataProducerRef = useRef<mediasoup.types.DataProducer | null>(null);
     const [remotePeers, setRemotePeers] = useState<any>([]);
     const [remoteVideoElements, setRemoteVideoElements] = useState<HTMLElement[]>([]);
     const [remoteTrackGroups, setRemoteTrackGroups] = useState<any>([]);
@@ -79,12 +71,15 @@ const ChatRoom = () => {
         //     socket.io.opts.transports = ["polling", "websocket"];
         // });
 
-        startCall();
-
-        window.addEventListener('beforeunload', leaveRoom);
+        socket.on("connect", async() => {
+            await startCall();
+        });
+        window.addEventListener('beforeunload', () => {
+            socket.disconnect();
+        });
 
         return () => {
-            leaveRoom();
+            socket.disconnect();
         };
     }, []);
 
@@ -116,7 +111,6 @@ const ChatRoom = () => {
         });
     }
 
-
     async function enableTranslation() {
         setTranslationEnabled(!translationEnabled);
         // we retrieve all messages and translate them
@@ -134,7 +128,7 @@ const ChatRoom = () => {
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (currentMessage.trim()) {
-            sendMessage(currentMessage);
+            // sendMessage(currentMessage);
         }
         setCurrentMessage('');
     };
@@ -158,10 +152,6 @@ const ChatRoom = () => {
     }, [messages]);
 
     // Leave the room
-    const leaveRoom = () => {
-        socketRef.current?.emit('leave-room', { roomId });
-        socketRef.current?.disconnect();
-    };
 
     // Get and return the local stream
     const getLocalStream = async () => {
@@ -200,413 +190,65 @@ const ChatRoom = () => {
         });
     };
 
-    // Create and retun a new device
-    const createDevice = () => {
-        return new Promise<void>(async (resolve, reject) => {
-            try {
-                localDeviceRef.current = new Device();
-                if (rtpCapabilitiesRef.current !== null) {
-                    await localDeviceRef.current?.load({ routerRtpCapabilities: rtpCapabilitiesRef.current });
-                    console.log('Device created: ', localDeviceRef.current);
-                    resolve();
-                } else {
-                    reject(new Error("RTP Capabilities not set"));
-                }
-            } catch (error) {
-                console.error("Failed to create device:", error);
-                reject(error);
-            }
-        });
-    };
+    async function startCall() {
+        const localStream = await getLocalStream();
+        await handleLocalStream(localStream);
 
+        const peerConnection = new RTCPeerConnection({
+            iceServers: [
+              {
+                urls: "stun:stun.cloudflare.com:3478",
+              },
+            ],
+            bundlePolicy: "max-bundle",
+          });
 
-    const createSendTransport = () => {
-        return new Promise<void>((resolve) => {
-            socketRef.current?.emit('createWebRtcTransport', { roomId, direction: 'send' }, (data: any) => {
-                if (data.error) {
-                    console.error('Create send transport error: ', data.error);
-                    return;
-                }
+        const dc = peerConnection.createDataChannel("server-events");
+        await peerConnection.setLocalDescription(
+            await peerConnection.createOffer()
+        );
 
-                console.log('Create send transport: ', data);
-
-                localProducerTransportRef.current = localDeviceRef.current?.createSendTransport(data) || null;
-                console.log('Local producer transport: ', localProducerTransportRef.current);
-
-                localProducerTransportRef.current?.on('connect', async ({ dtlsParameters }, callback, errback) => {
-                    console.log('Producer transport connected');
-                    socketRef.current?.emit('transport-connect', { roomId, dtlsParameters, direction: 'send', transportId: data.id });
-                    callback();
-                });
-
-                localProducerTransportRef.current?.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
-                    console.log('Produce event');
-
-                    try {
-                        socketRef.current?.emit('transport-produce', {
-                            roomId,
-                            transportId: localProducerTransportRef.current?.id,
-                            kind,
-                            rtpParameters,
-                            appData
-                        }, ({ id }: any) => {
-                            console.log('Produce: ', id);
-                            callback({ id });
-                        })
-                    } catch (error) {
-                        console.error('Produce error: ', error);
-                        errback(error as Error);
-                    }
-                });
-
-                localProducerTransportRef.current?.on('producedata', async ({ sctpStreamParameters, label, protocol }, callback, errback) => {
-                    console.log('Produce data event');
-
-                    try {
-                        socketRef.current?.emit('transport-produce-data', {
-                            roomId,
-                            transportId: localProducerTransportRef.current?.id,
-                            sctpStreamParameters,
-                            label,
-                            protocol
-                        }, ({ id }: any) => {
-                            console.log('Produce data: ', id);
-                            callback({ id });
-                        });
-                    } catch (error) {
-                        console.error('Produce data error: ', error);
-                        errback(error as Error);
-                    }
-                });
-
-                resolve();
-            });
-        });
-    }
-
-    const produceVideo = async () => {
-        localVideoProducerRef.current = await localProducerTransportRef.current?.produce(videoParams) || null;
-        console.log('Local video producer: ', localVideoProducerRef.current);
-
-        localVideoProducerRef.current?.on('trackended', () => {
-            console.log('Track ended');
-        });
-
-        localVideoProducerRef.current?.on('transportclose', () => {
-            console.log('Transport close');
-        });
-    }
-
-    const produceAudio = async () => {
-        localAudioProducerRef.current = await localProducerTransportRef.current?.produce(audioParams) || null;
-        console.log('Local audio producer: ', localAudioProducerRef.current);
-
-        localAudioProducerRef.current?.on('trackended', () => {
-            console.log('Track ended');
-        });
-
-        localAudioProducerRef.current?.on('transportclose', () => {
-            console.log('Transport close');
-        });
-    }
-
-    const produceData = async () => {
-
-        try {
-            // localDataProducerRef.current = await localProducerTransportRef.current?.produceData({
-            //     ordered: true,
-            //     label: 'chat',
-            //     protocol: 'chat'
-            // }) || null;
-
-            const localDataProducer = new Promise<any>((resolve) => {
-                const dataProducer = localProducerTransportRef.current?.produceData({
-                    ordered: true,
-                    label: 'chat',
-                    protocol: 'chat'
-                });
-                resolve(dataProducer);
-            });
-
-            localDataProducerRef.current = await localDataProducer;
-
-            console.log('Local data producer: ', localDataProducerRef.current);
-
-            localDataProducerRef.current?.on('transportclose', () => {
-                console.log('Data producer transport close');
-            });
-
-            localDataProducerRef.current?.on('close', () => {
-                console.log('Data producer close');
-            });
-
-            localDataProducerRef.current?.on('bufferedamountlow', () => {
-                console.log('Data producer buffered amount low');
-            });
-
-            localDataProducerRef.current?.on('error', (error) => {
-                console.error('Data producer error: ', error);
-            });
-
-            localDataProducerRef.current?.on('open', () => {
-                console.log('Data producer open');
-            });
-
-            localDataProducerRef.current?.on('close', () => {
-                console.log('Data producer close');
-            });
-
-            localDataProducerRef.current?.send('Hello');
-        } catch (error) {
-            console.error('Produce data error: ', error);
-        }
-
-    }
-
-    const createReceiveTransport = async () => {
-        return new Promise<any>((resolve) => {
-            socketRef.current?.emit('createWebRtcTransport', { roomId, direction: 'recv' }, (data: any) => {
-                console.log('Create receive transport: ', data);
-                const consumerTransport = localDeviceRef.current?.createRecvTransport(data);
-
-                consumerTransport?.on('connect', async ({ dtlsParameters }, callback, errback) => {
-                    console.log('Consumer transport connected');
-                    socketRef.current?.emit('transport-connect', { roomId, dtlsParameters, direction: 'recv', transportId: data.id });
-                    callback();
-                });
-
-                resolve({ consumerTransport, serverReceiveTransportId: data.id });
-            });
-        });
-    };
-
-    const createConsumer = async (consumerTransport: any, producer: any, serverReceiveTransportId: any) => {
-        return new Promise<any>((resolve) => {
-            socketRef.current?.emit('transport-consume', {
+        const {sessionId, sessionDescription} = await fetch(process.env.REACT_APP_BACKEND + "/join-room",{
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
                 roomId,
-                producerId: producer.id,
-                rtpCapabilities: localDeviceRef.current?.rtpCapabilities,
-                transportId: serverReceiveTransportId
-            }, async (data: any) => {
-                console.log('Consume: ', data);
+                localDescription: peerConnection.localDescription,
+            }),
+        }).then((res) => res.json());
 
-                const consumer = await consumerTransport.consume({
-                    id: data.id,
-                    producerId: data.producerId,
-                    kind: data.kind,
-                    rtpParameters: data.rtpParameters,
-                });
-
-                console.log('Consumer: ', consumer);
-
-                resolve({ consumer, id: data.id });
-            });
-        });
-    };
-
-    const createDataConsumer = async (consumerTransport: any, producer: any, serverReceiveTransportId: any) => {
-        return new Promise<any>((resolve) => {
-            socketRef.current?.emit('transport-consume-data', {
-                roomId,
-                dataProducerId: producer.id,
-                rtpCapabilities: localDeviceRef.current?.rtpCapabilities,
-                transportId: serverReceiveTransportId
-            }, async (data: any) => {
-                console.log('Consume data: ', data);
-
-                const consumer = await consumerTransport.consumeData({
-                    id: data.id,
-                    dataProducerId: data.dataProducerId,
-                    sctpStreamParameters: data.sctpStreamParameters,
-                    label: 'chat',
-                    protocol: 'chat'
-                });
-
-                consumer.on('message', (message: string) => {
-                    console.log('Message: ', JSON.parse(message));
-
-                    let mst = JSON.parse(message) as { socketId: string, username: string, message: string, translated: string | null };
-                    console.log('translation enabled', translationEnabled)
-                    console.log('mst.username', mst.username)
-                    if (mst.username !== username) {
-                        console.log('Translating message: ', mst.message);
-                        translate(mst.message, selectedLanguage).then((translated) => {
-                            mst.translated = translated;
-                            setMessages((prevMessages: any) => {
-                                const updatedMessages = [...prevMessages, mst];
-                                console.log('Messages updated: ', updatedMessages);
-                                return updatedMessages;
-                            });
-                        });
-                    } else {
-                        console.log('Message not translated: ', mst.message);
-                        setMessages((prevMessages) => {
-                            const updatedMessages = [...prevMessages, JSON.parse(message)];
-                            console.log('Messages updated: ', updatedMessages);
-                            return updatedMessages;
-                        });
-                    }
-                });
-
-                consumer.on('transportclose', () => {
-                    console.log('Consumer transport close');
-                });
-
-                console.log('Consumer: ', consumer);
-
-                resolve({ consumer, id: data.id });
-            });
-        });
-    };
-
-    const handleRemotePeer = async (peer: any) => {
-        const { consumerTransport, serverReceiveTransportId } = await createReceiveTransport();
-        console.log('Receive transport: ', consumerTransport);
-
-        let serverConsumerId;
-
-        const tracks: MediaStreamTrack[] = [];
-        for (const producer of peer.producers) {
-            if (producer.kind === 'audio' || producer.kind === 'video') {
-                const { consumer, id } = await createConsumer(consumerTransport, producer, serverReceiveTransportId);
-                serverConsumerId = id;
-                console.log('Consumer: ', consumer);
-                tracks.push(consumer.track);
-                console.log('Tracks: ', tracks);
-
-                console.log('Peer: ', peer);
-            }
-
-            if (producer.dataProducer) {
-                await createDataConsumer(consumerTransport, producer, serverReceiveTransportId);
-            }
-        }
-
-        // const remoteVideoElement = document.createElement('video');
-        // remoteVideoElement.dataset.socketId = peer.socketId;
-        // const mediaStream = new MediaStream();
-        // tracks.forEach((track) => {
-        //     mediaStream.addTrack(track);
-        // });
-        // console.log('mediaStream: ', mediaStream);
-        // remoteVideoElement.srcObject = mediaStream;
-
-        // setRemoteVideoElements((prevElements: any) => {
-        //     const updatedElements = [...prevElements, remoteVideoElement];
-        //     console.log('Remote video elements: ', updatedElements);
-        //     return updatedElements;
+        socketRef.current?.emit("join-room", {roomId, sessionId});
+        // const connected = new Promise((res, rej) => {
+        //     // timeout after 5s
+        //     setTimeout(rej, 5000);
+        //     const iceConnectionStateChangeHandler = () => {
+        //         if (peerConnection.iceConnectionState === "connected") {
+        //             peerConnection.removeEventListener(
+        //                 "iceconnectionstatechange",
+        //                 iceConnectionStateChangeHandler
+        //             );
+        //             res(undefined);
+        //         }
+        //     };
+        //     peerConnection.addEventListener(
+        //         "iceconnectionstatechange",
+        //         iceConnectionStateChangeHandler
+        //     );
         // });
 
-        setRemoteTrackGroups((prevTrackGroups: any) => {
-            const updatedTrackGroups = [...prevTrackGroups, { socketId: peer.socketId, tracks }];
-            console.log('Remote track groups: ', updatedTrackGroups);
-            return updatedTrackGroups;
-        });
+        await peerConnection.setRemoteDescription(sessionDescription);
 
-        socketRef.current?.emit('consumer-resume', { roomId, serverConsumerId: serverConsumerId });
-    };
-
-    const informPeers = () => {
-        socketRef.current?.emit('new-peer', { roomId, socketId: localSocketIdRef.current });
+        return {
+            peerConnection,
+            dc,
+            sessionId,
+        }
     }
 
-    const joinRoom = () => {
-        return new Promise<any>((resolve) => {
-            socketRef.current?.emit('join-room', { roomId, username }, (data: any) => {
-                console.log('Joined room: ', roomId);
-                rtpCapabilitiesRef.current = data.rtpCapabilities;
-                console.log('RTP Capabilities: ', rtpCapabilitiesRef.current);
-
-                roomJoinedRef.current = true;
-
-                // setRemotePeers((prevPeers: any) => {
-                //     const updatedPeers = data.otherPeers;
-                //     console.log('Other peers:', updatedPeers);
-                //     return updatedPeers;
-                // });
-
-                // for (const peer of data.otherPeers) {
-                //     handleRemotePeer(peer);
-                // }
-
-                resolve({ peers: data.otherPeers });
-            });
-        });
-    };
-
-    const handlePeerLeft = async () => {
-        socketRef.current?.on('peer-left', (socketId: any) => {
-            console.log('Peer left: ', socketId);
-
-            setRemotePeers((prevPeers: any) => {
-                const updatedPeers = prevPeers.filter((peer: any) => peer.socketId !== socketId);
-                console.log('Remote peers updated: peer left: ', updatedPeers);
-                return updatedPeers;
-            });
-
-            setRemoteTrackGroups((prevTrackGroups: any) => {
-                const updatedTrackGroups = prevTrackGroups.filter((trackGroup: any) => trackGroup.socketId !== socketId);
-                console.log('Remote track groups updated: peer left: ', updatedTrackGroups);
-                return updatedTrackGroups;
-            });
-        });
-    };
 
 
-    const sendMessage = (message: string) => {
-        const data = {
-            socketId: localSocketIdRef.current,
-            username,
-            message,
-            translated: null
-        }
-        console.log('Sending message: ', data);
-        localDataProducerRef.current?.send(JSON.stringify(data));
-
-        setMessages((prevMessages: any) => {
-            const updatedMessages = [...prevMessages, data];
-            console.log('Messages updated: ', updatedMessages);
-            return updatedMessages;
-        });
-    }
-
-    // Start the call, this is the main function
-    const startCall = async () => {
-
-        socketRef.current?.on('connected', ({ socketId }) => {
-            console.log('Connected to the server with socket id: ', socketId);
-            localSocketIdRef.current = socketId;
-        });
-
-        const { peers } = await joinRoom();
-        await handleLocalStream(await getLocalStream());
-        await createDevice();
-        await createSendTransport();
-        await produceAudio();
-        await produceVideo();
-        await produceData();
-        await informPeers();
-
-        handlePeerLeft();
-
-        if (peers.length > 0) {
-            for (const peer of peers) {
-                handleRemotePeer(peer);
-            }
-        }
-
-        socketRef.current?.on('new-peer', (peer: any) => {
-            console.log('New peer: ', peer);
-
-            // setRemotePeers((prevPeers: any) => {
-            //     const updatedPeers = [...prevPeers, peer];
-            //     console.log('Remote peers updated: new peer: ', updatedPeers);
-            //     return updatedPeers;
-            // });
-
-            handleRemotePeer(peer);
-        });
-    };
 
 
     // return (

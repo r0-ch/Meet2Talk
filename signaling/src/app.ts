@@ -1,9 +1,9 @@
-import https from 'https';
-import http from 'http';
+import express from "express";
+import http from "http";
 import { Server } from 'socket.io';
-import * as mediasoup from 'mediasoup';
-import fs from 'fs';
-import { consumers } from 'stream';
+import { PrismaClient } from "@prisma/client";
+import cors from 'cors';
+import bodyParser from "body-parser";
 import 'dotenv/config'
 
 // const options = {
@@ -12,427 +12,243 @@ import 'dotenv/config'
 // };
 
 // const httpsServer = https.createServer(options);
+const app = express();
 
-const httpsServer = http.createServer(
-    (req, res) => {
-        res.writeHead(200);
-        res.end('hello world\n');
-    }
-);
+const server = http.createServer(app);
+const APP_ID = "2bed04bd3e17acf79e12a149c165f197";
+      // ❗❗❗ DO NOT USE YOUR TOKEN IN THE BROWSER FOR PRODUCTION. It should be kept and used server-side.
+      const APP_TOKEN = "d42be833915eb3db59cab405a93e5d7af70e29b38080c909a578ffa4190d600e";
+      // We'll use this for authentication when making requests to the Calls API.
+      const headers = {
+        Authorization: `Bearer ${APP_TOKEN}`,
+      };
+const API_BASE = `https://rtc.live.cloudflare.com/v1/apps/${APP_ID}`;
 
+const prisma = new PrismaClient();
+(async () => {
+    await prisma.session.deleteMany();
+    await prisma.room.updateMany({
+        data: {
+            userCount: 0
+        }
+    });
+    // await prisma.room.deleteMany();
 
-const io = new Server(httpsServer, {
+})();
+
+const io = new Server(server, {
     cors: {
         origin: `${process.env.CORS_ORIGIN}`,
-        methods: ['GET', 'POST'],
         credentials: true,
     },
 });
+
+app.use(cors());
+app.use(bodyParser.json())
 console.log('CORS_ORIGIN: ', process.env.CORS_ORIGIN);
 
+
+async function createChannel(sessionId: string){
+    const channel1resp = await fetch(
+        `${API_BASE}/sessions/${sessionId}/datachannels/new`,
+        {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                dataChannels: [
+                    {
+                        location: "local",
+                        dataChannelName: "channel-one",
+                    },
+                ],
+            }),
+        }
+    ).then((res) => res.json());
+
+    return channel1resp;
+}
+
+async function connectToSessionID(sessionId: string, remoteSessionId: string){
+    const session = await fetch(
+        `${API_BASE}/sessions/${sessionId}/datachannels/new`,
+        {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                dataChannels: [
+                    {
+                        location: "remote",
+                        sessionId: remoteSessionId,
+                        dataChannelName: "channel-one",
+                    },
+                ],
+            }),
+        }
+    ).then((res) => res.json());
+
+    return session;
+}
 // const connections = io.of('/signaling');
 
-httpsServer.listen(8000, () => {
-    console.log('Server listening on port 8000');
+app.get('/get-room', async (req, res) => {
+    try{
+    let room = await prisma.room.findFirst({
+        where: {
+            userCount: {
+                lt: 6
+            }
+        }
+    });
 
-
-}).on('error', (e) => {
-    console.error(e);
+    if(!room) {
+        room = await prisma.room.create({
+            data: {
+                maxUsers: 5,
+                userCount: 0,
+            },
+        });
+    }
+    res.json(room);
+}catch(err){
+    console.log(err);
+    res.status(500).send('Internal Server Error');
+}
 });
 
-let worker: mediasoup.types.Worker;
-let rooms: any = {};
+app.post('/join-room', async (req, res) => {
+    try {
+        const { roomId, localDescription } = req.body;
+        let room = await prisma.room.findFirst({
+            where: {
+                id: roomId,
+                userCount: {
+                    lt: 6
+                }
+            },
+            include:{
+                Sessions: true
+            }
+        });
 
-const mediaCodecs: mediasoup.types.RtpCodecCapability[] = [
-    {
-        kind: 'audio' as const,
-        mimeType: 'audio/opus',
-        clockRate: 48000,
-        channels: 2
-    },
-    {
-        kind: 'video' as const,
-        mimeType: 'video/VP8',
-        clockRate: 90000,
-        parameters: {
-            'x-google-start-bitrate': 1000
+        if(!room) {
+            res.status(404).send('Room not found or full');
+            return;
         }
+
+
+        const session = await fetch(
+            `${API_BASE}/sessions/new`,
+            {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    sessionDescription: localDescription,
+                }),
+            }
+        ).then((res) => res.json());
+
+
+
+        await prisma.session.create({
+            data: {
+                roomId: roomId,
+                sessionId: session.sessionId,
+            }
+        });
+        room = await prisma.room.update({
+            where: {
+                id: roomId
+            },
+            data: {
+                userCount: {
+                    increment: 1
+                }
+            },
+            include:{
+                Sessions: true
+            }
+        });
+
+        res.json({
+            sessionId: session.sessionId,
+            sessionDescription: session.sessionDescription,
+            sessions: room.Sessions || []
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Internal Server Error');
     }
-];
+});
 
-const createWorker = async () => {
-    console.log(`WEBRTC_MIN_PORT: ${process.env.WEBRTC_MIN_PORT}`);
-    console.log(`WEBRTC_MAX_PORT: ${process.env.WEBRTC_MAX_PORT}`);
-    const worker = await mediasoup.createWorker({
-        rtcMinPort: process.env.WEBRTC_MIN_PORT ? parseInt(process.env.WEBRTC_MIN_PORT) : 40000,
-        rtcMaxPort: process.env.WEBRTC_MAX_PORT ? parseInt(process.env.WEBRTC_MAX_PORT) : 49999,
-    });
 
-    console.log('mediasoup worker created');
-
-    worker.on('died', () => {
-        console.error('mediasoup worker died');
-        process.exit(1);
-    });
-
-    return worker;
-}
-
-const createWebRtcTransport = async (router: any) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            console.log('ip: ', `${process.env.WEBRTC_LISTEN_IP}`);
-            console.log('announcedAddress: ', `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` ? `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` : null);
-            const webRtcTransport_options = {
-                listenInfos:
-                    [
-                        {
-                            protocol: "udp",
-                            ip: `${process.env.WEBRTC_LISTEN_IP}`,
-                            announcedAddress: `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` ? `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` : null,
-                        },
-                        {
-                            protocol: "tcp",
-                            ip: `${process.env.WEBRTC_LISTEN_IP}`,
-                            announcedAddress: `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` ? `${process.env.WEBRTC_ANNOUNCED_ADDRESS}` : null,
-                        }
-                    ],
-                    
-                enableUdp: true,
-                enableTcp: true,
-                preferUdp: true,
-                enableSctp: true,
-
-                // stunServers: [
-                //     {
-                //         urls: 'stun:stun.l.google.com:19302',
-
-                //     }
-                // ]
+io.on('connection', (socket) => {
+    console.log('a user connected');
+    socket.on('join-room', async ({roomId, sessionId}) => {
+        console.log('join-room', roomId, sessionId);
+        socket.join(roomId);
+        socket.to(roomId).emit('user-connected', sessionId);
+        const session = await prisma.session.findFirst({
+            where: {
+                sessionId: sessionId
             }
-            console.log('WebRTC transport options: ', webRtcTransport_options);
+        });
 
-            let transport = await router.createWebRtcTransport(webRtcTransport_options);
-            console.log('Transport created:', transport.id);
-
-            transport.on('dtlsstatechange', (dtlsState: any) => {
-                if (dtlsState === 'closed') {
-                    transport.close();
-                }
-            });
-
-            transport.on('@close', () => {
-                console.log('Transport closed');
-            });
-
-            resolve(transport);
-
-        } catch (error) {
-            reject(error);
+        if(!session) {
+            console.log('Session not found');
+            return;
         }
+
+        await prisma.session.update({
+            where: {
+                id: session.id
+            },
+            data: {
+                socketId: socket.id
+            }
+        });
     });
-}
 
-(async () => {
-    worker = await createWorker();
-})();
-
-try {
-    io.on('connection', async (socket) => {
-        console.log('Client connected: ', socket.id);
-
-        socket.emit('connected', {
-            socketId: socket.id,
+    socket.on('disconnect', async() => {
+        console.log('user disconnected');
+        const session = await prisma.session.findFirst({
+            where: {
+                socketId: socket.id
+            }
         });
 
-        socket.on('disconnect', () => {
-            console.log('Client disconnected: ', socket.id);
-        });
+        if(!session) {
+            console.log('Session not found');
+            return;
+        }
 
-        socket.on('leave-room', ({ roomId }) => {
-            console.log('Client: ', socket.id, ' left room: ', roomId);
-
-            if (rooms[roomId]) {
-                const peer = rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id);
-
-                if (peer) {
-                    peer.transports.forEach(async (transport: any) => {
-                        await transport.transport.close();
-                    });
-
-                    peer.producers.forEach(async (producer: any) => {
-                        if (producer.producer) {
-                            await producer.producer.close();
-                        } else if (producer.dataProducer) {
-                            await producer.dataProducer.close();
-                        }
-                    });
-
-                    peer.consumers.forEach(async (consumer: any) => {
-                        if (consumer.consumer) {
-                            await consumer.consumer.close();
-                        } else if (consumer.dataConsumer) {
-                            await consumer.dataConsumer.close();
-                        }
-                    });
-
-                    rooms[roomId]['peers'] = rooms[roomId]['peers'].filter((peer: any) => peer.socketId !== socket.id);
-
-                    if (rooms[roomId]['peers'].length === 0) {
-                        rooms[roomId]['router'].close();
-                        delete rooms[roomId];
-                    }
+        socket.to(session.roomId).emit('user-disconnected', session.sessionId);
+        await prisma.room.update({
+            where: {
+                id: session.roomId
+            },
+            data: {
+                userCount: {
+                    decrement: 1
                 }
             }
-
-            socket.broadcast.to(roomId).emit('peer-left', socket.id);
-
-            socket.leave(roomId);
         });
 
-        socket.on('join-room', async ({ roomId, username }, callback) => {
-            console.log('Client joined room: ', roomId);
-
-            socket.join(roomId);
-
-            if (!rooms[roomId]) {
-                rooms[roomId] = {};
-                rooms[roomId]['router'] = await worker.createRouter({ mediaCodecs });
-                rooms[roomId]['peers'] = [];
-                rooms[roomId]['peers'].push({
-                    socketId: socket.id,
-                    username: username,
-                    transports: [],
-                    producers: [],
-                    dataProducers: [],
-                    consumers: [],
-                    dataConsumers: [],
-                });
-            } else {
-                rooms[roomId]['peers'].push({
-                    socketId: socket.id,
-                    username: username,
-                    transports: [],
-                    producers: [],
-                    consumers: [],
-                });
-            }
-
-            // console.log('Peers in room: ', rooms[roomId]['peers']);
-
-            const rtpCapabilities = rooms[roomId]['router'].rtpCapabilities;
-
-            const otherPeers = rooms[roomId]['peers'].filter((peer: any) => peer.socketId !== socket.id);
-
-            callback({ rtpCapabilities, otherPeers });
-        });
-
-        socket.on('new-peer', ({ roomId, username }) => {
-            console.log('New peer joined room: ', roomId);
-
-            socket.broadcast.to(roomId).emit('new-peer', rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id));
-        });
-
-        socket.on('createWebRtcTransport', async ({ roomId, direction }, callback) => {
-            console.log('Create WebRTC transport');
-
-            try {
-                const router = rooms[roomId]['router'];
-                const transport: any = await createWebRtcTransport(router);
-
-                callback({
-                    id: transport.id,
-                    iceParameters: transport.iceParameters,
-                    iceCandidates: transport.iceCandidates,
-                    dtlsParameters: transport.dtlsParameters,
-                    sctpParameters: transport.sctpParameters,
-                });
-
-                const peer = rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id);
-                peer['transports'].push({
-                    id: transport.id,
-                    transport: transport,
-                    direction: direction,
-                });
-
-                console.log(`WebRTC transport created: ${transport.id} direction: ${direction} for peer: ${socket.id} in room: ${roomId}`);
-                console.log(`Transports for peer: ${socket.id} in room: ${roomId}: `, rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id).transports);
-            } catch (error) {
-                console.error(error);
-                callback({
-                    error: error,
-                });
+        await prisma.session.delete({
+            where: {
+                id: session.id
             }
         });
-
-        socket.on('transport-connect', async ({ roomId, dtlsParameters, direction, transportId }) => {
-            console.log('Transport connect direction: ', direction);
-            console.log('Transport connect transportId: ', transportId);
-
-            const transport = rooms[roomId]['peers']
-                .find((peer: any) => peer.socketId === socket.id).transports
-                .find((transport: any) => transport.id === transportId).transport;
-
-            await transport.connect({ dtlsParameters });
-
-            console.log(`WebRTC transport connected: ${transport.id} direction: ${direction} for peer: ${socket.id} in room: ${roomId}`);
-        });
-
-        socket.on('transport-produce', async ({ roomId, transportId, kind, rtpParameters, appData }, callback) => {
-            console.log('Produce');
-
-            const transport = rooms[roomId]['peers']
-                .find((peer: any) => peer.socketId === socket.id).transports
-                .find((transport: any) => transport.direction === 'send').transport;
-
-            const producer = await transport.produce({ kind, rtpParameters });
-
-            callback({ id: producer.id });
-
-            const peer = rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id);
-            peer['producers'].push({
-                id: producer.id,
-                producer: producer,
-                kind: kind,
-            });
-
-            callback({ id: producer.id });
-
-            console.log(`Producer created: ${producer.id} kind: ${kind} for peer: ${socket.id} in room: ${roomId}`);
-            console.log(`Producers for peer: ${socket.id} in room: ${roomId}: `, rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id).producers);
-        });
-
-        socket.on('transport-produce-data', async ({ roomId, transportId, sctpStreamParameters, label, protocol, appData }, callback) => {
-            console.log('Produce data');
-
-            const transport = rooms[roomId]['peers']
-                .find((peer: any) => peer.socketId === socket.id).transports
-                .find((transport: any) => transport.direction === 'send').transport;
-
-            const dataProducer = await transport.produceData({
-                sctpStreamParameters,
-                label,
-                protocol,
-            });
-
-            callback({ id: dataProducer.id });
-
-            const peer = rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id);
-            peer['producers'].push({
-                id: dataProducer.id,
-                dataProducer: dataProducer,
-            });
-
-            console.log(`Data producer created: ${dataProducer.id} for peer: ${socket.id} in room: ${roomId}`);
-            console.log(`Data producers for peer: ${socket.id} in room: ${roomId}: `, rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id).producers);
-
-        });
-
-        socket.on('transport-consume', async ({ roomId, producerId, rtpCapabilities, transportId }, callback) => {
-            console.log('Consume');
-
-            const router = rooms[roomId]['router'];
-
-            console.log(`can consume: producer ${producerId}, ${rtpCapabilities} })}`);
-            if (!router.canConsume({ producerId, rtpCapabilities })) {
-                console.error('Can not consume');
-                return;
-            }
-
-            const transport = rooms[roomId]['peers']
-                .find((peer: any) => peer.socketId === socket.id).transports
-                .find((transport: any) => transport.id === transportId).transport;
-
-            const consumer = await transport.consume({
-                producerId,
-                rtpCapabilities,
-                paused: true,
-            });
-
-            consumer.on('producerclose', () => {
-                console.log('Producer closed');
-                consumer.close();
-            });
-
-            consumer.on('transportclose', () => {
-                console.log('Transport closed');
-                consumer.close();
-            });
-
-            callback({
-                id: consumer.id,
-                producerId: producerId,
-                kind: consumer.kind,
-                rtpParameters: consumer.rtpParameters,
-            });
-
-            const peer = rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id);
-            peer['consumers'].push({
-                consumer: consumer,
-                kind: consumer.kind,
-            });
-
-            console.log(`Consumer created: ${consumer.id} kind: ${consumer.kind} for peer: ${socket.id} in room: ${roomId}`);
-            console.log('Consumers in room: ', rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id).consumers);
-        });
-
-        socket.on('transport-consume-data', async ({ roomId, dataProducerId, transportId }, callback) => {
-            console.log('Consume data');
-
-            console.log(`Consume data: ${dataProducerId}`);
-
-            const transport = rooms[roomId]['peers']
-                .find((peer: any) => peer.socketId === socket.id).transports
-                .find((transport: any) => transport.id === transportId).transport;
-
-            const dataConsumer = await transport.consumeData({
-                dataProducerId,
-                // sctpStreamParameters,
-                // label,
-                // protocol,
-            });
-
-            dataConsumer.on('transportclose', () => {
-                console.log('Data consumer transport closed');
-                dataConsumer.close();
-            });
-
-            dataConsumer.on('dataproducerclose', () => {
-                console.log('Data producer closed');
-                dataConsumer.close();
-            });
-
-            dataConsumer.on('message', (message: any) => {
-                console.log('Data consumer message: ', message);
-            });
-
-            callback({
-                id: dataConsumer.id,
-                dataProducerId: dataProducerId,
-                sctpStreamParameters: dataConsumer.sctpStreamParameters,
-            });
-
-            const peer = rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id);
-            peer['consumers'].push({
-                dataConsumer: dataConsumer,
-            });
-
-            console.log(`Data consumer created: ${dataConsumer.id} for peer: ${socket.id} in room: ${roomId}`);
-            console.log('Data consumers in room: ', rooms[roomId]['peers'].find((peer: any) => peer.socketId === socket.id).dataConsumers);
-        });
-
-        socket.on('consumer-resume', async ({ roomId, serverConsumerId }) => {
-            console.log('Consumer resume');
-            console.log(`Consumer resume: ${serverConsumerId}`);
-
-            const consumer = rooms[roomId]['peers']
-                .find((peer: any) => peer.socketId === socket.id).consumers
-                .find((consumer: any) => consumer.consumer?.id === serverConsumerId).consumer;
-
-            await consumer.resume();
-        });
-
     });
-} catch (error) {
-    console.error(error);
-}
+});
+
+
+
+
+
+
+
+
+server.listen(8000, () => {
+    console.log('listening on *:8000');
+  });
+
