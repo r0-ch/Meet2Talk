@@ -7,7 +7,7 @@ import { enable } from "workbox-navigation-preload";
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
-    const { username = 'Guest', selectedLanguage =  "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
+    const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const rtpCapabilitiesRef = useRef<mediasoup.types.RtpCapabilities | null>(null);
@@ -90,8 +90,12 @@ const ChatRoom = () => {
 
 
     async function translate(text: string, target: string = "en") {
-        return new Promise<string>(async(resolve, reject) => {
+        return new Promise<string | null>(async (resolve, reject) => {
             try {
+                if (translationEnabled) {
+                    resolve(null);
+                    return;
+                }
                 const res = await fetch("https://plx.ketsuna.com/translate", {
                     method: "POST",
                     body: JSON.stringify({
@@ -420,11 +424,28 @@ const ChatRoom = () => {
 
                 consumer.on('message', (message: string) => {
                     console.log('Message: ', JSON.parse(message));
-                    setMessages((prevMessages) => {
-                        const updatedMessages = [...prevMessages, JSON.parse(message)];
-                        console.log('Messages updated: ', updatedMessages);
-                        return updatedMessages;
-                    });
+
+                    let mst = JSON.parse(message) as { socketId: string, username: string, message: string, translated: string | null };
+                    console.log('translation enabled', translationEnabled)
+                    console.log('mst.username', mst.username)
+                    if (mst.username !== username) {
+                        console.log('Translating message: ', mst.message);
+                        translate(mst.message, selectedLanguage).then((translated) => {
+                            mst.translated = translated;
+                            setMessages((prevMessages: any) => {
+                                const updatedMessages = [...prevMessages, mst];
+                                console.log('Messages updated: ', updatedMessages);
+                                return updatedMessages;
+                            });
+                        });
+                    } else {
+                        console.log('Message not translated: ', mst.message);
+                        setMessages((prevMessages) => {
+                            const updatedMessages = [...prevMessages, JSON.parse(message)];
+                            console.log('Messages updated: ', updatedMessages);
+                            return updatedMessages;
+                        });
+                    }
                 });
 
                 consumer.on('transportclose', () => {
@@ -723,7 +744,7 @@ const ChatRoom = () => {
 
                     <div className="w-full flex justify-start mb-2 ml-2">
                         <button
-                            onClick={async() => await enableTranslation()}
+                            onClick={async () => await enableTranslation()}
                             className="text-gray-300 hover:text-gray-100"
                         >
                             {translationEnabled ? 'Original conversation' : 'Translate conversation'}
