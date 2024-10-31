@@ -3,6 +3,7 @@ import mediasoup, { Device } from "mediasoup-client";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import backgroundImage from '../img/worldwide.jpg'; // Chemin vers l'image
+import { enable } from "workbox-navigation-preload";
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
@@ -113,7 +114,7 @@ const ChatRoom = () => {
 
 
     async function enableTranslation() {
-        setTranslationEnabled(!enableTranslation);
+        setTranslationEnabled(!translationEnabled);
         // we retrieve all messages and translate them
         const translatedMessages = await Promise.all(messages.map(async (msg) => {
             if (msg.translated || msg.username === username) {
@@ -725,7 +726,7 @@ const ChatRoom = () => {
                             onClick={async() => await enableTranslation()}
                             className="text-gray-300 hover:text-gray-100"
                         >
-                            Translate conversation
+                            {translationEnabled ? 'Original conversation' : 'Translate conversation'}
                         </button>
                     </div>
 
