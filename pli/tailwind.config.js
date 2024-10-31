@@ -44,6 +44,7 @@ module.exports = {
       animation: {
         'slide-up': 'slideUp 0.5s ease-out',
         'slide-down': 'slideDown 0.5s ease-out',
+        'bg-scroll': 'bgScroll 100s ease-in-out infinite',
       },
       keyframes: {
         slideUp: {
@@ -53,6 +54,11 @@ module.exports = {
         slideDown: {
           '0%': { transform: 'translateY(0)' },
           '100%': { transform: 'translateY(100%)' },
+        },
+        bgScroll: {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
         },
       },
       fontFamily: {
