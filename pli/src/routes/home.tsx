@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import React from "react";
-import backgroundImage from '../img/worldwide.jpg'; // Chemin vers une image neutre
+import backgroundImage from "../img/worldwide.jpg"; // Chemin vers une image neutre
 
 export default function Home() {
   const [username, setUsername] = useState("");
@@ -28,7 +28,7 @@ export default function Home() {
 
   const removeTag = (e: any, tagToRemove: string) => {
     e.preventDefault();
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
   const handleSubmit = (e: any) => {
@@ -64,13 +64,20 @@ export default function Home() {
   return (
     <div className="relative flex items-center justify-center min-h-screen">
       <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${backgroundImage})`, filter: 'blur(4px)' }}
+        className="absolute inset-0 bg-cover bg-center animate-bg-scroll"
+        style={{
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: "200% 200%", // Pour donner un effet de défilement plus dynamique
+          filter: "blur(2px)",
+        }}
       />
-      <div className="absolute inset-0 bg-black opacity-40" /> {/* Couche sombre */}
+      <div className="absolute inset-0 bg-black opacity-40" />{" "}
+      {/* Couche sombre */}
       {showWelcomeBox && (
         <div className="relative text-center bg-gray-900 bg-opacity-80 p-10 rounded-lg shadow-3xl">
-          <h1 className="text-4xl font-bold mb-6 text-white">Welcome to Meet2Talk</h1>
+          <h1 className="text-4xl font-bold mb-6 text-white">
+            Welcome to Meet2Talk
+          </h1>
           <button
             onClick={toggleForm}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-3xl transition-transform transform hover:scale-105"
@@ -81,9 +88,15 @@ export default function Home() {
       )}
       {/* Popup Form */}
       {showForm && (
-        <div className={`fixed inset-0 flex items-center justify-center ${isAnimatingOut ? 'animate-slide-down' : 'animate-slide-up'}`}>
+        <div
+          className={`fixed inset-0 flex items-center justify-center ${
+            isAnimatingOut ? "animate-slide-down" : "animate-slide-up"
+          }`}
+        >
           <div className="bg-gray-900 bg-opacity-80 p-8 rounded-lg shadow-3xl w-100">
-            <h2 className="text-2xl font-bold mb-6 text-center text-gray-200">Join a Room</h2>
+            <h2 className="text-2xl font-bold mb-6 text-center text-gray-200">
+              Join a Room
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
@@ -127,7 +140,10 @@ export default function Home() {
               </div>
               <div className="flex flex-wrap space-x-2 mt-4">
                 {tags.map((tag, index) => (
-                  <span key={index} className="bg-gray-700 text-gray-200 px-4 py-2 rounded-full flex items-center">
+                  <span
+                    key={index}
+                    className="bg-gray-700 text-gray-200 px-4 py-2 rounded-full flex items-center"
+                  >
                     {tag}
                     <button
                       onClick={(e) => removeTag(e, tag)}
@@ -141,7 +157,11 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={username.trim() === "" || selectedLanguage === ""}
-                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" || selectedLanguage === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700 shadow-3xl"}`}
+                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${
+                  username.trim() === "" || selectedLanguage === ""
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700 shadow-3xl"
+                }`}
               >
                 Join Room
               </button>
