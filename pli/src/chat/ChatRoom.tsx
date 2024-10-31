@@ -745,9 +745,9 @@ const ChatRoom = () => {
                     <div className="w-full flex justify-start mb-2 ml-2">
                         <button
                             onClick={async () => await enableTranslation()}
-                            className="text-gray-300 hover:text-gray-100"
+                            className={` ${translationEnabled ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
                         >
-                            {translationEnabled ? 'Original conversation' : 'Translate conversation'}
+                            Translate conversation
                         </button>
                     </div>
 
