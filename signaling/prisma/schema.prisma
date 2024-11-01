@@ -23,11 +23,21 @@ model Room {
 }
 
 model Session {
-  id        String   @id @default(cuid())
   room      Room     @relation(fields: [roomId], references: [id])
-  sessionId String
+  sessionId String   @id
   roomId    String
   socketId  String?
+  Tracks    Tracks[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Tracks {
+  id        String   @id @default(cuid())
+  Session  Session  @relation(fields: [sessionId], references: [sessionId])
+  sessionId String
+  kind      String
+  label     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

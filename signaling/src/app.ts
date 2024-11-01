@@ -117,7 +117,8 @@ app.get('/get-room', async (req, res) => {
 
 app.post('/join-room', async (req, res) => {
     try {
-        const { roomId, localDescription } = req.body;
+        const { roomId, localDescription, tracks } = req.body;
+        console.log('join-room', roomId, localDescription, tracks);
         let room = await prisma.room.findFirst({
             where: {
                 id: roomId,
@@ -147,7 +148,17 @@ app.post('/join-room', async (req, res) => {
             }
         ).then((res) => res.json());
 
-
+        const pushTracksResponse = await fetch(
+            `${API_BASE}/sessions/${session.sessionId}/tracks/new`,
+            {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                sessionDescription: localDescription,
+                tracks,
+              }),
+            },
+          ).then((res) => res.json());
 
         await prisma.session.create({
             data: {
@@ -172,7 +183,8 @@ app.post('/join-room', async (req, res) => {
         res.json({
             sessionId: session.sessionId,
             sessionDescription: session.sessionDescription,
-            sessions: room.Sessions || []
+            sessions: room.Sessions || [],
+            tracks: pushTracksResponse,
         });
     } catch (err) {
         console.log(err);

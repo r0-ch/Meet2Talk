@@ -24,6 +24,9 @@ const ChatRoom = () => {
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
+    const LocalPeerConnection = useRef<RTCPeerConnection | null>(null);
+    const dataChannel = useRef<RTCDataChannel | null>(null);
+    const sessionId = useRef<string | null>(null);
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
@@ -72,7 +75,7 @@ const ChatRoom = () => {
         // });
 
         socket.on("connect", async() => {
-            await startCall();
+            await createPeerConnection();
         });
         window.addEventListener('beforeunload', () => {
             socket.disconnect();
@@ -171,18 +174,7 @@ const ChatRoom = () => {
             const localVideoElement = document.getElementById('localVideo') as HTMLVideoElement;
             localVideoElement.srcObject = localStream;
 
-            const videoTrack = localStream.getVideoTracks()[0];
-            const audioTrack = localStream.getAudioTracks()[0];
 
-            videoParams = {
-                track: videoTrack,
-                ...videoParams
-            };
-
-            audioParams = {
-                track: audioTrack,
-                ...audioParams
-            };
 
             localVideoElement.onloadedmetadata = () => {
                 resolve();
@@ -190,7 +182,7 @@ const ChatRoom = () => {
         });
     };
 
-    async function startCall() {
+    async function createPeerConnection() {
         const localStream = await getLocalStream();
         await handleLocalStream(localStream);
 
@@ -207,7 +199,14 @@ const ChatRoom = () => {
         await peerConnection.setLocalDescription(
             await peerConnection.createOffer()
         );
+        const transceivers = localStream.getTracks().map((track) =>
+            peerConnection.addTransceiver(track, {
+              direction: "sendonly",
+            }),
+          );
 
+
+        console.log('Peer connection: ', transceivers);
         const {sessionId, sessionDescription} = await fetch(process.env.REACT_APP_BACKEND + "/join-room",{
             method: "POST",
             headers: {
@@ -216,8 +215,15 @@ const ChatRoom = () => {
             body: JSON.stringify({
                 roomId,
                 localDescription: peerConnection.localDescription,
+                tracks:transceivers.map(({ mid, sender }: any) => ({
+                    location: "local",
+                    mid,
+                    trackName: sender.track?.id,
+                  }))
             }),
         }).then((res) => res.json());
+
+
 
         socketRef.current?.emit("join-room", {roomId, sessionId});
         // const connected = new Promise((res, rej) => {
@@ -240,15 +246,10 @@ const ChatRoom = () => {
 
         await peerConnection.setRemoteDescription(sessionDescription);
 
-        return {
-            peerConnection,
-            dc,
-            sessionId,
-        }
+        LocalPeerConnection.current = peerConnection;
+        dataChannel.current = dc;
+        sessionId.current = sessionId;
     }
-
-
-
 
 
     // return (
