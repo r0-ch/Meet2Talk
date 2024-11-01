@@ -3,30 +3,64 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import backgroundImage from '../img/worldwide.jpg'; // Chemin vers l'image
 
+const APP_ID = "2bed04bd3e17acf79e12a149c165f197";
+// ❗❗❗ DO NOT USE YOUR TOKEN IN THE BROWSER FOR PRODUCTION. It should be kept and used server-side.
+const APP_TOKEN = "d42be833915eb3db59cab405a93e5d7af70e29b38080c909a578ffa4190d600e";
+// We'll use this for authentication when making requests to the Calls API.
+const headers = {
+    Authorization: `Bearer ${APP_TOKEN}`,
+};
+const API_BASE = `https://rtc.live.cloudflare.com/v1/apps/${APP_ID}`;
+
+
+export interface Root {
+    sessionId: string
+    sessionDescription: RTCSessionDescriptionInit
+    remotes: Remote[]
+}
+
+interface RemoteParticipant {
+    peerConnection: RTCPeerConnection;
+    sessionId: string;
+    username: string;
+    tracks: MediaStreamTrack[];
+}
+
+
+export interface Remote {
+    sessionId: string
+    roomId: string
+    socketId: any
+    createdAt: string
+    updatedAt: string
+    Tracks: Track[]
+}
+
+export interface Track {
+    id: string
+    sessionId: string
+    createdAt: string
+    updatedAt: string
+}
+
+
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
-    const [remotePeers, setRemotePeers] = useState<any>([]);
-    const [remoteVideoElements, setRemoteVideoElements] = useState<HTMLElement[]>([]);
-    const [remoteTrackGroups, setRemoteTrackGroups] = useState<any>([]);
+    const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
     const [messages, setMessages] = useState<{ socketId: string, username: string, message: string, translated: string | null }[]>([]);
-    const roomJoinedRef = useRef<boolean>(false);
-    // const { roomId } = useParams<{ roomId: string }>();
-    const location = useLocation();
-    // const { username } = location.state || { username: 'You' };
     const [currentMessage, setCurrentMessage] = useState('');
     // const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
     const [translationEnabled, setTranslationEnabled] = useState(false);
-    const [users, setUsers] = useState<{ username: string }[]>([]);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
     const LocalPeerConnection = useRef<RTCPeerConnection | null>(null);
     const dataChannel = useRef<RTCDataChannel | null>(null);
-    const sessionId = useRef<string | null>(null);
+    const localSession = useRef<string | null>(null);
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
@@ -45,23 +79,6 @@ const ChatRoom = () => {
         return shuffled.slice(0, 2);
     };
 
-    let videoParams: any = {
-        encoding: [
-            { rid: 'r0', maxBitrate: 100000, scalabilityMode: 'S1T3' },
-            { rid: 'r1', maxBitrate: 300000, scalabilityMode: 'S1T3' },
-            { rid: 'r2', maxBitrate: 900000, scalabilityMode: 'S1T3' }
-        ],
-        codecOptions: {
-            videoGoogleStartBitrate: 1000
-        }
-    };
-
-    let audioParams: any = {
-        codecOptions: {
-            opusStereo: 1
-        }
-    };
-
     useEffect(() => {
         const socket = io(`${process.env.REACT_APP_BACKEND}`, {
             withCredentials: true,
@@ -74,9 +91,26 @@ const ChatRoom = () => {
         //     socket.io.opts.transports = ["polling", "websocket"];
         // });
 
-        socket.on("connect", async() => {
-            await createPeerConnection();
+        socket.on("connect", async () => {
+            await startCall();
+            socket.on("user-connected", (sessionId: string) => {
+                fetch(`${process.env.REACT_APP_BACKEND}/get-session/${sessionId}`).then((res) => res.json()).then((data) => {
+                    joinSession(localSession.current as string, data.Tracks.map((track: any) => ({
+                        location: "remote",
+                        trackName: track?.id,
+                        sessionId: sessionId,
+                    })));
+                });
+            });
+
+            socket.on("user-disconnected", (sessionId: string) => {
+                console.log('user disconnected', sessionId);
+                setRemoteParticipants((prevParticipants) => prevParticipants.filter((participant) => participant.sessionId !== sessionId));
+
+                console.log('remote participants: ', remoteParticipants);
+            });
         });
+
         window.addEventListener('beforeunload', () => {
             socket.disconnect();
         });
@@ -85,6 +119,8 @@ const ChatRoom = () => {
             socket.disconnect();
         };
     }, []);
+
+
 
 
     async function translate(text: string, target: string = "en") {
@@ -135,12 +171,6 @@ const ChatRoom = () => {
         }
         setCurrentMessage('');
     };
-    // Permet de mettre à jour la liste des utilisateurs
-    useEffect(() => {
-        if (!users.some(user => user.username === username)) {
-            setUsers((prevUsers) => [...prevUsers, { username }]);
-        }
-    }, [username]);
 
     // Fonction pour scroller jusqu'au dernier message
     const scrollToBottom = () => {
@@ -174,40 +204,33 @@ const ChatRoom = () => {
             const localVideoElement = document.getElementById('localVideo') as HTMLVideoElement;
             localVideoElement.srcObject = localStream;
 
-
-
             localVideoElement.onloadedmetadata = () => {
                 resolve();
             };
         });
     };
 
-    async function createPeerConnection() {
-        const localStream = await getLocalStream();
-        await handleLocalStream(localStream);
+    async function startCall() {
+        const media = await getLocalStream();
+        await handleLocalStream(media);
 
-        const peerConnection = new RTCPeerConnection({
-            iceServers: [
-              {
-                urls: "stun:stun.cloudflare.com:3478",
-              },
-            ],
-            bundlePolicy: "max-bundle",
-          });
+        const peerConnection = await createPeerConnection();
+        const dc = peerConnection.createDataChannel("chat");
 
-        const dc = peerConnection.createDataChannel("server-events");
+        // Ajoute les transceivers AVANT de créer l'offre
+        const transceivers = media.getTracks().map((track) =>
+            peerConnection.addTransceiver(track, {
+                direction: "sendonly",
+            }),
+        );
+
+        // Crée l'offre APRÈS avoir ajouté les transceivers
         await peerConnection.setLocalDescription(
             await peerConnection.createOffer()
         );
-        const transceivers = localStream.getTracks().map((track) =>
-            peerConnection.addTransceiver(track, {
-              direction: "sendonly",
-            }),
-          );
-
 
         console.log('Peer connection: ', transceivers);
-        const {sessionId, sessionDescription} = await fetch(process.env.REACT_APP_BACKEND + "/join-room",{
+        const { sessionId, sessionDescription, remotes } = await fetch(process.env.REACT_APP_BACKEND + "/join-room", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -215,43 +238,166 @@ const ChatRoom = () => {
             body: JSON.stringify({
                 roomId,
                 localDescription: peerConnection.localDescription,
-                tracks:transceivers.map(({ mid, sender }: any) => ({
+                tracks: transceivers.map(({ mid, sender }: any) => ({
                     location: "local",
                     mid,
                     trackName: sender.track?.id,
-                  }))
+                }))
             }),
-        }).then((res) => res.json());
+        }).then((res) => res.json() as unknown as Root);
+
+        console.log('Tracks: ', remotes);
+        const connected = new Promise((res, rej) => {
+            // timeout after 5s
+            setTimeout(rej, 5000);
+            const iceConnectionStateChangeHandler = () => {
+                if (peerConnection.iceConnectionState === "connected") {
+                    peerConnection.removeEventListener(
+                        "iceconnectionstatechange",
+                        iceConnectionStateChangeHandler,
+                    );
+                    res(undefined);
+                }
+            };
+            peerConnection.addEventListener(
+                "iceconnectionstatechange",
+                iceConnectionStateChangeHandler,
+            );
+        });
+
+        await peerConnection.setRemoteDescription(
+            new RTCSessionDescription(sessionDescription),
+        );
+
+        await connected;
+
+        socketRef.current?.emit("join-room", { roomId, sessionId });
+
+        const trackToPull = remotes.map((remote) => {
+            return {
+                sessionId: remote.sessionId,
+                tracks: remote.Tracks.map((track) => ({
+                    location: "remote",
+                    trackName: track?.id,
+                    sessionId: remote.sessionId,
+                })),
+            }
+        });
 
 
 
-        socketRef.current?.emit("join-room", {roomId, sessionId});
-        // const connected = new Promise((res, rej) => {
-        //     // timeout after 5s
-        //     setTimeout(rej, 5000);
-        //     const iceConnectionStateChangeHandler = () => {
-        //         if (peerConnection.iceConnectionState === "connected") {
-        //             peerConnection.removeEventListener(
-        //                 "iceconnectionstatechange",
-        //                 iceConnectionStateChangeHandler
-        //             );
-        //             res(undefined);
-        //         }
-        //     };
-        //     peerConnection.addEventListener(
-        //         "iceconnectionstatechange",
-        //         iceConnectionStateChangeHandler
-        //     );
-        // });
+        trackToPull.forEach(async (track) => {
+            await joinSession(sessionId, track.tracks);
+        });
 
-        await peerConnection.setRemoteDescription(sessionDescription);
 
         LocalPeerConnection.current = peerConnection;
         dataChannel.current = dc;
-        sessionId.current = sessionId;
+        localSession.current = sessionId;
     }
 
 
+    async function joinSession(remoteSessionID: string, track: any) {
+        const remotePeerConnection = await createPeerConnection();
+        const pullResponse = await fetch(
+            `${API_BASE}/sessions/${remoteSessionID}/tracks/new`,
+            {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    tracks: track,
+                }),
+            },
+        ).then((res) => res.json());
+        const resolvingTracks = Promise.all(
+            pullResponse.tracks.map(
+                ({ mid }: any) =>
+                    // This will resolve when the track for the corresponding mid is added.
+                    new Promise((res, rej) => {
+                        setTimeout(rej, 5000);
+                        const handleTrack = ({ transceiver, track }: any) => {
+                            if (transceiver.mid !== mid) return;
+                            remotePeerConnection.removeEventListener(
+                                "track",
+                                handleTrack,
+                            );
+                            res(track);
+                        };
+                        remotePeerConnection.addEventListener(
+                            "track",
+                            handleTrack,
+                        );
+                    }),
+            ),
+        );
+        // Handle renegotiation, this will always be true when pulling tracks
+        if (pullResponse.requiresImmediateRenegotiation) {
+            // We got a session description from the remote in the response,
+            // we need to set it as the remote description
+            await remotePeerConnection.setRemoteDescription(
+                pullResponse.sessionDescription,
+            );
+            // Create an answer
+            const remoteAnswer = await remotePeerConnection.createAnswer();
+            // And set it as local description
+            await remotePeerConnection.setLocalDescription(remoteAnswer);
+            // Send our answer back to the Calls API
+            const renegotiateResponse = await fetch(
+                `${API_BASE}/sessions/${remoteSessionID}/renegotiate`,
+                {
+                    method: "PUT",
+                    headers,
+                    body: JSON.stringify({
+                        sessionDescription: {
+                            sdp: remoteAnswer.sdp,
+                            type: "answer",
+                        },
+                    }),
+                },
+            ).then((res) => res.json());
+            if (renegotiateResponse.errorCode) {
+                throw new Error(renegotiateResponse.errorDescription);
+            }
+        }
+        const pulledTracks = await resolvingTracks;
+        setRemoteParticipants((prevParticipants) => {
+            const updatedParticipants = [...prevParticipants, {
+                peerConnection: remotePeerConnection,
+                sessionId: remoteSessionID,
+                username: remoteSessionID,
+                tracks: pulledTracks,
+            }];
+            console.log('remote participants updated: ', updatedParticipants);
+
+            return updatedParticipants;
+        });
+    }
+
+    async function createPeerConnection() {
+
+        const getTurnServers = await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/0ee35057ebbbd4c4bf8843b1786e5918/credentials/generate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer c48c6121e6854ad8c119e4468ba061b78e129d0a0e233d9c180dee27f238e18b`
+            },
+            body: JSON.stringify({ ttl: 86400 })
+        });
+        const turnServers = await getTurnServers.json();
+
+        const peerConnection = new RTCPeerConnection({
+            bundlePolicy: "max-bundle",
+            iceServers: [
+                {
+                    ...turnServers.iceServers,
+                },
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" },
+            ],
+            iceTransportPolicy: "all",
+        });
+        return peerConnection;
+    }
     // return (
     //     <div>
     //         <h1>Room: {roomId}</h1>
@@ -299,7 +445,8 @@ const ChatRoom = () => {
                 >
                     <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
                     <ul className="space-y-2">
-                        {users.map((user, index) => (
+                        <li className="text-white">{username}</li>
+                        {remoteParticipants.length > 0 && remoteParticipants.map((user, index) => (
                             <li key={index} className="text-white">{user.username}</li>
                         ))}
                     </ul>
@@ -335,16 +482,16 @@ const ChatRoom = () => {
                         <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
                             <video autoPlay controls id="localVideo" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
 
-                            {remoteTrackGroups && remoteTrackGroups.map((trackGroup: any, index: number) => {
+                            {remoteParticipants.length > 0 && remoteParticipants.map((trackGroup, index) => {
                                 const mediaStream = new MediaStream();
-                                trackGroup.tracks.forEach((track: MediaStreamTrack) => {
+                                trackGroup.tracks.forEach((track) => {
                                     mediaStream.addTrack(track);
                                 });
 
                                 return (
                                     <video className="w-[25%] h-[100%] border border-gray-600 rounded-md"
                                         key={index} ref={video => {
-                                            if (video) { video.srcObject = mediaStream; video.dataset.socketId = trackGroup.socketId; }
+                                            if (video) { video.srcObject = mediaStream; video.dataset.sessionId = trackGroup.sessionId; }
                                         }} autoPlay controls>
                                     </video>
                                 );

@@ -16,16 +16,17 @@ const app = express();
 
 const server = http.createServer(app);
 const APP_ID = "2bed04bd3e17acf79e12a149c165f197";
-      // ❗❗❗ DO NOT USE YOUR TOKEN IN THE BROWSER FOR PRODUCTION. It should be kept and used server-side.
-      const APP_TOKEN = "d42be833915eb3db59cab405a93e5d7af70e29b38080c909a578ffa4190d600e";
-      // We'll use this for authentication when making requests to the Calls API.
-      const headers = {
-        Authorization: `Bearer ${APP_TOKEN}`,
-      };
+// ❗❗❗ DO NOT USE YOUR TOKEN IN THE BROWSER FOR PRODUCTION. It should be kept and used server-side.
+const APP_TOKEN = "d42be833915eb3db59cab405a93e5d7af70e29b38080c909a578ffa4190d600e";
+// We'll use this for authentication when making requests to the Calls API.
+const headers = {
+    Authorization: `Bearer ${APP_TOKEN}`,
+};
 const API_BASE = `https://rtc.live.cloudflare.com/v1/apps/${APP_ID}`;
 
 const prisma = new PrismaClient();
 (async () => {
+    await prisma.tracks.deleteMany();
     await prisma.session.deleteMany();
     await prisma.room.updateMany({
         data: {
@@ -46,49 +47,6 @@ const io = new Server(server, {
 app.use(cors());
 app.use(bodyParser.json())
 console.log('CORS_ORIGIN: ', process.env.CORS_ORIGIN);
-
-
-async function createChannel(sessionId: string){
-    const channel1resp = await fetch(
-        `${API_BASE}/sessions/${sessionId}/datachannels/new`,
-        {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                dataChannels: [
-                    {
-                        location: "local",
-                        dataChannelName: "channel-one",
-                    },
-                ],
-            }),
-        }
-    ).then((res) => res.json());
-
-    return channel1resp;
-}
-
-async function connectToSessionID(sessionId: string, remoteSessionId: string){
-    const session = await fetch(
-        `${API_BASE}/sessions/${sessionId}/datachannels/new`,
-        {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                dataChannels: [
-                    {
-                        location: "remote",
-                        sessionId: remoteSessionId,
-                        dataChannelName: "channel-one",
-                    },
-                ],
-            }),
-        }
-    ).then((res) => res.json());
-
-    return session;
-}
-// const connections = io.of('/signaling');
 
 app.get('/get-room', async (req, res) => {
     try{
@@ -118,7 +76,6 @@ app.get('/get-room', async (req, res) => {
 app.post('/join-room', async (req, res) => {
     try {
         const { roomId, localDescription, tracks } = req.body;
-        console.log('join-room', roomId, localDescription, tracks);
         let room = await prisma.room.findFirst({
             where: {
                 id: roomId,
@@ -127,7 +84,11 @@ app.post('/join-room', async (req, res) => {
                 }
             },
             include:{
-                Sessions: true
+                Sessions: {
+                    include: {
+                        Tracks: true
+                    }
+                }
             }
         });
 
@@ -142,11 +103,10 @@ app.post('/join-room', async (req, res) => {
             {
                 method: "POST",
                 headers,
-                body: JSON.stringify({
-                    sessionDescription: localDescription,
-                }),
             }
         ).then((res) => res.json());
+
+        console.log('session', session);
 
         const pushTracksResponse = await fetch(
             `${API_BASE}/sessions/${session.sessionId}/tracks/new`,
@@ -164,6 +124,13 @@ app.post('/join-room', async (req, res) => {
             data: {
                 roomId: roomId,
                 sessionId: session.sessionId,
+                Tracks: {
+                    createMany: {
+                        data: tracks.map((track: any) => ({
+                            id: track.trackName,
+                        }))
+                    }
+                }
             }
         });
         room = await prisma.room.update({
@@ -176,15 +143,20 @@ app.post('/join-room', async (req, res) => {
                 }
             },
             include:{
-                Sessions: true
+                Sessions: {
+                    include: {
+                        Tracks: true
+                    }
+                }
             }
         });
 
+
+
         res.json({
             sessionId: session.sessionId,
-            sessionDescription: session.sessionDescription,
-            sessions: room.Sessions || [],
-            tracks: pushTracksResponse,
+            sessionDescription: pushTracksResponse?.sessionDescription,
+            remotes: room.Sessions.filter((s) => s.sessionId !== session.sessionId)
         });
     } catch (err) {
         console.log(err);
@@ -192,6 +164,29 @@ app.post('/join-room', async (req, res) => {
     }
 });
 
+app.get('/get-session/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const session = await prisma.session.findFirst({
+            where: {
+                sessionId: sessionId
+            },
+            include: {
+                Tracks: true
+            }
+        });
+
+        if(!session) {
+            res.status(404).send('Session not found');
+            return;
+        }
+
+        res.json(session);
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Internal Server Error');
+    }
+});
 
 io.on('connection', (socket) => {
     console.log('a user connected');
@@ -212,7 +207,7 @@ io.on('connection', (socket) => {
 
         await prisma.session.update({
             where: {
-                id: session.id
+                sessionId: sessionId
             },
             data: {
                 socketId: socket.id
@@ -221,7 +216,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', async() => {
-        console.log('user disconnected');
+
         const session = await prisma.session.findFirst({
             where: {
                 socketId: socket.id
@@ -232,7 +227,7 @@ io.on('connection', (socket) => {
             console.log('Session not found');
             return;
         }
-
+        console.log('user disconnected',session?.sessionId);
         socket.to(session.roomId).emit('user-disconnected', session.sessionId);
         await prisma.room.update({
             where: {
@@ -245,22 +240,21 @@ io.on('connection', (socket) => {
             }
         });
 
+        await prisma.tracks.deleteMany({
+            where: {
+                sessionId: session.sessionId
+            }
+        });
+
         await prisma.session.delete({
             where: {
-                id: session.id
-            }
+                sessionId: session.sessionId
+            },
         });
     });
 });
 
-
-
-
-
-
-
-
-server.listen(8000, () => {
+server.listen(8000,'0.0.0.0', () => {
     console.log('listening on *:8000');
   });
 

@@ -38,7 +38,7 @@
   "scripts": {
     "build:css": "npx tailwindcss -i ./src/index.css -o ./src/style.css",
     "watch:css": "npx tailwindcss -i ./src/index.css -o ./src/style.css --watch",
-    "start": "concurrently \"npm run watch:css\" \"react-scripts start\"",
+    "start": "concurrently \"npm run watch:css\" \"HOST=0.0.0.0 react-scripts start\"",
     "build": "npm run build:css && npx react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
