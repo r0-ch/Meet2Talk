@@ -3,46 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import backgroundImage from '../img/worldwide.jpg'; // Chemin vers l'image
 
-const APP_ID = "2bed04bd3e17acf79e12a149c165f197";
-// ❗❗❗ DO NOT USE YOUR TOKEN IN THE BROWSER FOR PRODUCTION. It should be kept and used server-side.
-const APP_TOKEN = "d42be833915eb3db59cab405a93e5d7af70e29b38080c909a578ffa4190d600e";
-// We'll use this for authentication when making requests to the Calls API.
-const headers = {
-    Authorization: `Bearer ${APP_TOKEN}`,
-};
-const API_BASE = `https://rtc.live.cloudflare.com/v1/apps/${APP_ID}`;
-
-
-export interface Root {
-    sessionId: string
-    sessionDescription: RTCSessionDescriptionInit
-    remotes: Remote[]
-}
-
 interface RemoteParticipant {
     peerConnection: RTCPeerConnection;
-    sessionId: string;
+    socketId: string;
     username: string;
-    tracks: MediaStreamTrack[];
+    dataChannel?: RTCDataChannel;
+    tracks?: MediaStreamTrack[];
 }
-
-
-export interface Remote {
-    sessionId: string
-    roomId: string
-    socketId: any
-    createdAt: string
-    updatedAt: string
-    Tracks: Track[]
-}
-
-export interface Track {
-    id: string
-    sessionId: string
-    createdAt: string
-    updatedAt: string
-}
-
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
@@ -60,7 +27,7 @@ const ChatRoom = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
     const LocalPeerConnection = useRef<RTCPeerConnection | null>(null);
     const dataChannel = useRef<RTCDataChannel | null>(null);
-    const localSession = useRef<string | null>(null);
+    const localVideoElement = useRef<HTMLVideoElement | null>(null);
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
@@ -85,29 +52,137 @@ const ChatRoom = () => {
         });
         console.log(`api: ${process.env.REACT_APP_BACKEND}`);
         socketRef.current = socket;
-
+        socket.on("connect_error", (err) => {
+            console.log('connect_error', err);
+            socket.io.opts.transports = ["polling", "websocket"];
+        });
         // socket.on("connect_error", () => {
         //     // revert to classic upgrade
         //     socket.io.opts.transports = ["polling", "websocket"];
         // });
 
         socket.on("connect", async () => {
-            await startCall();
-            socket.on("user-connected", (sessionId: string) => {
-                fetch(`${process.env.REACT_APP_BACKEND}/get-session/${sessionId}`).then((res) => res.json()).then((data) => {
-                    joinSession(localSession.current as string, data.Tracks.map((track: any) => ({
-                        location: "remote",
-                        trackName: track?.id,
-                        sessionId: sessionId,
-                    })));
-                });
+            localSocketIdRef.current = socket.id!;
+            console.log('socket connected', socket.id);
+            const media = await getLocalStream();
+            await handleLocalStream(media);
+            const { Sockets } = await fetch(`${process.env.REACT_APP_BACKEND}/get-room/${roomId}`).then((res) => res.json()) as { Sockets: { socketId: string, username: string }[] };
+            const remoteParticipants: RemoteParticipant[] = [];
+
+            socket.emit("join-room", {
+                roomId,
+                username,
             });
 
-            socket.on("user-disconnected", (sessionId: string) => {
-                console.log('user disconnected', sessionId);
-                setRemoteParticipants((prevParticipants) => prevParticipants.filter((participant) => participant.sessionId !== sessionId));
 
-                console.log('remote participants: ', remoteParticipants);
+            socket.on("offer", async ({ by, offer, username }) => {
+                console.log('offer', by, offer, username);
+                const peerConnection = await createPeerConnection();
+                await peerConnection.setRemoteDescription(offer);
+
+                // send Video
+                const media = await getLocalStream();
+                media.getTracks().forEach((track) => {
+                    peerConnection.addTrack(track, media);
+                });
+
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                socket.emit("answer", {
+                    socketId: by,
+                    answer,
+                });
+
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit("ice-candidate", {
+                            candidate: event.candidate,
+                            socketId: by,
+                        });
+                    }
+                };
+
+                let dc: RTCDataChannel = null!;
+                const remoteParticipant: RemoteParticipant = {
+                    peerConnection,
+                    socketId: by,
+                    username,
+                    tracks: peerConnection.getTransceivers().map((t) => t.receiver.track),
+                };
+
+                peerConnection.ondatachannel = (event) => {
+                    dc = event.channel;
+                    dc.onmessage = (event) => {
+                        const message = JSON.parse(event.data);
+                        if (message.socketId === localSocketIdRef.current) return;
+                        setMessages((prevMessages) => [...prevMessages, message]);
+                    };
+
+                    dc.onopen = () => {
+                        console.log('data channel open');
+                        remoteParticipant.dataChannel = dc;
+
+                        setRemoteParticipants((prevParticipants) => {
+                            const index = prevParticipants.findIndex((participant) => participant.socketId === by);
+                            prevParticipants[index] = remoteParticipant;
+                            return prevParticipants;
+                        });
+                    };
+                };
+
+                setRemoteParticipants((prevParticipants) => [...prevParticipants, remoteParticipant]);
+
+                // peerConnection.ontrack = (event) => {
+                //     remoteParticipant.tracks = event.streams[0].getTracks();
+                //     setRemoteParticipants((prevParticipants) => {
+                //         const index = prevParticipants.findIndex((participant) => participant.socketId === by);
+                //         prevParticipants[index] = remoteParticipant;
+                //         return prevParticipants;
+                //     });
+                // };
+
+            });
+
+            socket.on("user-disconnected", (socketId: string) => {
+                console.log('user disconnected', socketId);
+                const peerToDisconnect = remoteParticipants.find((participant) => participant.socketId === socketId);
+                if (peerToDisconnect) {
+                    peerToDisconnect.peerConnection.close();
+                }
+
+                setRemoteParticipants((prevParticipants) => prevParticipants.filter((participant) => participant.socketId !== socketId));
+            });
+
+            Sockets.forEach(async ({ socketId, username }) => {
+                const { peerConnection, dataChannel } = await startCall(socketId);
+
+                const remoteParticipant: RemoteParticipant = {
+                    peerConnection,
+                    socketId,
+                    username: username,
+                    dataChannel,
+                };
+
+                remoteParticipant.tracks = peerConnection.getTransceivers().map((t) => t.receiver.track);
+                remoteParticipants.push(remoteParticipant);
+
+                // peerConnection.ontrack = (event) => {
+                //     remoteParticipant.tracks = event.streams[0].getTracks();
+                //     setRemoteParticipants((prevParticipants) => {
+                //         const index = prevParticipants.findIndex((participant) => participant.socketId === socketId);
+                //         prevParticipants[index] = remoteParticipant;
+                //         return prevParticipants;
+                //     });
+                // };
+
+                dataChannel.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    if (message.socketId === localSocketIdRef.current) return;
+                    setMessages((prevMessages) => [...prevMessages, message]);
+                };
+
+                setRemoteParticipants(remoteParticipants);
             });
         });
 
@@ -154,7 +229,7 @@ const ChatRoom = () => {
         setTranslationEnabled(!translationEnabled);
         // we retrieve all messages and translate them
         const translatedMessages = await Promise.all(messages.map(async (msg) => {
-            if (msg.translated || msg.username === username) {
+            if (msg.translated || msg.socketId === localSocketIdRef.current) {
                 return msg;
             }
             const translated = await translate(msg.message, selectedLanguage);
@@ -167,7 +242,26 @@ const ChatRoom = () => {
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (currentMessage.trim()) {
-            // sendMessage(currentMessage);
+            remoteParticipants.forEach((participant) => {
+                if (participant.dataChannel?.readyState === "open") {
+                    participant.dataChannel.send(JSON.stringify({
+                        username,
+                        message: currentMessage,
+                        socketId: localSocketIdRef.current,
+                        translated: null,
+                    }));
+                }
+            });
+
+            setMessages((prevMessages) => [
+                ...prevMessages,
+                {
+                    username,
+                    message: currentMessage,
+                    socketId: localSocketIdRef.current!,
+                    translated: null,
+                },
+            ]);
         }
         setCurrentMessage('');
     };
@@ -193,208 +287,84 @@ const ChatRoom = () => {
             audio: true,
         });
 
-        console.log('Local stream: ', mediaStream);
-
         return mediaStream;
     };
 
     // Handle the local stream and set it to the local video element
     const handleLocalStream = (localStream: MediaStream) => {
         return new Promise<void>((resolve) => {
-            const localVideoElement = document.getElementById('localVideo') as HTMLVideoElement;
-            localVideoElement.srcObject = localStream;
+            if (localVideoElement.current) {
+                localVideoElement.current.srcObject = localStream;
 
-            localVideoElement.onloadedmetadata = () => {
-                resolve();
-            };
+                localVideoElement.current.onloadedmetadata = () => {
+                    resolve();
+                };
+            }
         });
     };
 
-    async function startCall() {
+    async function startCall(socketId: string) {
         const media = await getLocalStream();
-        await handleLocalStream(media);
-
+        console.log('startCall', socketId);
         const peerConnection = await createPeerConnection();
         const dc = peerConnection.createDataChannel("chat");
-
-        // Ajoute les transceivers AVANT de créer l'offre
-        const transceivers = media.getTracks().map((track) =>
-            peerConnection.addTransceiver(track, {
-                direction: "sendonly",
-            }),
-        );
-
+        media.getTracks().forEach((track) => {
+            peerConnection.addTrack(track, media);
+        });
         // Crée l'offre APRÈS avoir ajouté les transceivers
-        await peerConnection.setLocalDescription(
-            await peerConnection.createOffer()
-        );
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
 
-        console.log('Peer connection: ', transceivers);
-        const { sessionId, sessionDescription, remotes } = await fetch(process.env.REACT_APP_BACKEND + "/join-room", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                roomId,
-                localDescription: peerConnection.localDescription,
-                tracks: transceivers.map(({ mid, sender }: any) => ({
-                    location: "local",
-                    mid,
-                    trackName: sender.track?.id,
-                }))
-            }),
-        }).then((res) => res.json() as unknown as Root);
-
-        console.log('Tracks: ', remotes);
-        const connected = new Promise((res, rej) => {
-            // timeout after 5s
-            setTimeout(rej, 5000);
-            const iceConnectionStateChangeHandler = () => {
-                if (peerConnection.iceConnectionState === "connected") {
-                    peerConnection.removeEventListener(
-                        "iceconnectionstatechange",
-                        iceConnectionStateChangeHandler,
-                    );
-                    res(undefined);
-                }
-            };
-            peerConnection.addEventListener(
-                "iceconnectionstatechange",
-                iceConnectionStateChangeHandler,
-            );
+        socketRef.current?.emit("offer", {
+            socketId: socketId,
+            offer: peerConnection.localDescription,
+            username,
         });
 
-        await peerConnection.setRemoteDescription(
-            new RTCSessionDescription(sessionDescription),
-        );
-
-        await connected;
-
-        socketRef.current?.emit("join-room", { roomId, sessionId });
-
-        const trackToPull = remotes.map((remote) => {
-            return {
-                sessionId: remote.sessionId,
-                tracks: remote.Tracks.map((track) => ({
-                    location: "remote",
-                    trackName: track?.id,
-                    sessionId: remote.sessionId,
-                })),
-            }
+        socketRef.current?.on("answer", async (data) => {
+            if (socketId !== data.by) return;
+            console.log('ANSWER', data);
+            await peerConnection.setRemoteDescription(data.answer);
         });
 
 
-
-        trackToPull.forEach(async (track) => {
-            await joinSession(sessionId, track.tracks);
-        });
-
-
-        LocalPeerConnection.current = peerConnection;
-        dataChannel.current = dc;
-        localSession.current = sessionId;
-    }
-
-
-    async function joinSession(remoteSessionID: string, track: any) {
-        const remotePeerConnection = await createPeerConnection();
-        const pullResponse = await fetch(
-            `${API_BASE}/sessions/${remoteSessionID}/tracks/new`,
-            {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                    tracks: track,
-                }),
-            },
-        ).then((res) => res.json());
-        const resolvingTracks = Promise.all(
-            pullResponse.tracks.map(
-                ({ mid }: any) =>
-                    // This will resolve when the track for the corresponding mid is added.
-                    new Promise((res, rej) => {
-                        setTimeout(rej, 5000);
-                        const handleTrack = ({ transceiver, track }: any) => {
-                            if (transceiver.mid !== mid) return;
-                            remotePeerConnection.removeEventListener(
-                                "track",
-                                handleTrack,
-                            );
-                            res(track);
-                        };
-                        remotePeerConnection.addEventListener(
-                            "track",
-                            handleTrack,
-                        );
-                    }),
-            ),
-        );
-        // Handle renegotiation, this will always be true when pulling tracks
-        if (pullResponse.requiresImmediateRenegotiation) {
-            // We got a session description from the remote in the response,
-            // we need to set it as the remote description
-            await remotePeerConnection.setRemoteDescription(
-                pullResponse.sessionDescription,
-            );
-            // Create an answer
-            const remoteAnswer = await remotePeerConnection.createAnswer();
-            // And set it as local description
-            await remotePeerConnection.setLocalDescription(remoteAnswer);
-            // Send our answer back to the Calls API
-            const renegotiateResponse = await fetch(
-                `${API_BASE}/sessions/${remoteSessionID}/renegotiate`,
-                {
-                    method: "PUT",
-                    headers,
-                    body: JSON.stringify({
-                        sessionDescription: {
-                            sdp: remoteAnswer.sdp,
-                            type: "answer",
-                        },
-                    }),
-                },
-            ).then((res) => res.json());
-            if (renegotiateResponse.errorCode) {
-                throw new Error(renegotiateResponse.errorDescription);
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socketRef.current?.emit("ice-candidate", {
+                    candidate: event.candidate,
+                    socketId,
+                });
             }
         }
-        const pulledTracks = await resolvingTracks;
-        setRemoteParticipants((prevParticipants) => {
-            const updatedParticipants = [...prevParticipants, {
-                peerConnection: remotePeerConnection,
-                sessionId: remoteSessionID,
-                username: remoteSessionID,
-                tracks: pulledTracks,
-            }];
-            console.log('remote participants updated: ', updatedParticipants);
 
-            return updatedParticipants;
+        socketRef.current?.on("ice-candidate", async (data) => {
+            if (socketId !== data.by) return;
+            console.log('ICE CANDIDATE', data);
+            await peerConnection.addIceCandidate(data.candidate);
         });
+
+        peerConnection.onnegotiationneeded = async () => {
+            console.log('negotiation needed');
+            console.log(peerConnection.iceConnectionState);
+        }
+
+        peerConnection.onconnectionstatechange = () => {
+            console.log('connection state', peerConnection.connectionState);
+        }
+
+        return {
+            peerConnection,
+            dataChannel: dc,
+        }
     }
 
     async function createPeerConnection() {
-
-        const getTurnServers = await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/0ee35057ebbbd4c4bf8843b1786e5918/credentials/generate", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer c48c6121e6854ad8c119e4468ba061b78e129d0a0e233d9c180dee27f238e18b`
-            },
-            body: JSON.stringify({ ttl: 86400 })
-        });
-        const turnServers = await getTurnServers.json();
-
         const peerConnection = new RTCPeerConnection({
-            bundlePolicy: "max-bundle",
             iceServers: [
                 {
-                    ...turnServers.iceServers,
+                    urls: "stun:stun.relay.metered.ca:80"
                 },
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-            ],
-            iceTransportPolicy: "all",
+            ]
         });
         return peerConnection;
     }
@@ -480,18 +450,18 @@ const ChatRoom = () => {
                     {/* Section des Vidéos */}
                     {!isChatExpanded && (
                         <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
-                            <video autoPlay controls id="localVideo" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
+                            <video autoPlay controls ref={localVideoElement} className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
 
-                            {remoteParticipants.length > 0 && remoteParticipants.map((trackGroup, index) => {
+                            {remoteParticipants.length > 0 && remoteParticipants.map((remote, index) => {
                                 const mediaStream = new MediaStream();
-                                trackGroup.tracks.forEach((track) => {
+                                remote.tracks?.forEach((track) => {
                                     mediaStream.addTrack(track);
                                 });
 
                                 return (
                                     <video className="w-[25%] h-[100%] border border-gray-600 rounded-md"
                                         key={index} ref={video => {
-                                            if (video) { video.srcObject = mediaStream; video.dataset.sessionId = trackGroup.sessionId; }
+                                            if (video) { video.srcObject = mediaStream; video.dataset.socketId = remote.socketId; }
                                         }} autoPlay controls>
                                     </video>
                                 );
@@ -518,10 +488,10 @@ const ChatRoom = () => {
                             messages.map((msg, index) => (
                                 <div
                                     key={index}
-                                    className={`flex items-center mb-3 ${msg.socketId != localSocketIdRef.current ? 'justify-start' : 'justify-end'}`}
+                                    className={`flex items-center mb-3 ${msg.socketId !== localSocketIdRef.current ? 'justify-start' : 'justify-end'}`}
                                 >
                                     <div
-                                        className={`p-3 rounded-lg max-w-md break-words ${msg.socketId != localSocketIdRef.current ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
+                                        className={`p-3 rounded-lg max-w-md break-words ${msg.socketId !== localSocketIdRef.current ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
                                     >
                                         <span className="font-semibold block mb-1">{msg.username}:</span>
                                         <span>{translationEnabled && msg.translated ? msg.translated : msg.message}</span>

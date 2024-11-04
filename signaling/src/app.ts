@@ -15,19 +15,10 @@ import 'dotenv/config'
 const app = express();
 
 const server = http.createServer(app);
-const APP_ID = "2bed04bd3e17acf79e12a149c165f197";
-// ❗❗❗ DO NOT USE YOUR TOKEN IN THE BROWSER FOR PRODUCTION. It should be kept and used server-side.
-const APP_TOKEN = "d42be833915eb3db59cab405a93e5d7af70e29b38080c909a578ffa4190d600e";
-// We'll use this for authentication when making requests to the Calls API.
-const headers = {
-    Authorization: `Bearer ${APP_TOKEN}`,
-};
-const API_BASE = `https://rtc.live.cloudflare.com/v1/apps/${APP_ID}`;
 
 const prisma = new PrismaClient();
 (async () => {
-    await prisma.tracks.deleteMany();
-    await prisma.session.deleteMany();
+    await prisma.socket.deleteMany();
     await prisma.room.updateMany({
         data: {
             userCount: 0
@@ -49,186 +40,117 @@ app.use(bodyParser.json())
 console.log('CORS_ORIGIN: ', process.env.CORS_ORIGIN);
 
 app.get('/get-room', async (req, res) => {
-    try{
-    let room = await prisma.room.findFirst({
-        where: {
-            userCount: {
-                lt: 6
-            }
-        }
-    });
-
-    if(!room) {
-        room = await prisma.room.create({
-            data: {
-                maxUsers: 5,
-                userCount: 0,
-            },
-        });
-    }
-    res.json(room);
-}catch(err){
-    console.log(err);
-    res.status(500).send('Internal Server Error');
-}
-});
-
-app.post('/join-room', async (req, res) => {
     try {
-        const { roomId, localDescription, tracks } = req.body;
         let room = await prisma.room.findFirst({
             where: {
-                id: roomId,
                 userCount: {
                     lt: 6
                 }
-            },
-            include:{
-                Sessions: {
-                    include: {
-                        Tracks: true
-                    }
-                }
             }
         });
 
-        if(!room) {
-            res.status(404).send('Room not found or full');
-            return;
+        if (!room) {
+            room = await prisma.room.create({
+                data: {
+                    maxUsers: 5,
+                    userCount: 0,
+                },
+            });
         }
+        res.json(room);
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Internal Server Error');
+    }
+});
 
-
-        const session = await fetch(
-            `${API_BASE}/sessions/new`,
-            {
-                method: "POST",
-                headers,
-            }
-        ).then((res) => res.json());
-
-        console.log('session', session);
-
-        const pushTracksResponse = await fetch(
-            `${API_BASE}/sessions/${session.sessionId}/tracks/new`,
-            {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                sessionDescription: localDescription,
-                tracks,
-              }),
+app.get('/get-room/:id', async (req, res) => {
+    try {
+        const room = await prisma.room.findUnique({
+            where: {
+                id: req.params.id
             },
-          ).then((res) => res.json());
-
-        await prisma.session.create({
-            data: {
-                roomId: roomId,
-                sessionId: session.sessionId,
-                Tracks: {
-                    createMany: {
-                        data: tracks.map((track: any) => ({
-                            id: track.trackName,
-                        }))
-                    }
-                }
+            include: {
+                Sockets: true
             }
         });
-        room = await prisma.room.update({
+
+        if (!room) {
+            res.status(404).send('Room not found');
+        }
+        res.json(room);
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+
+io.on('connection', (socket) => {
+    socket.on('join-room', async ({ roomId, username }) => {
+        console.log('join-room', socket.id, username);
+        socket.join(roomId);
+        await prisma.room.update({
             where: {
                 id: roomId
             },
             data: {
                 userCount: {
                     increment: 1
-                }
-            },
-            include:{
-                Sessions: {
-                    include: {
-                        Tracks: true
+                },
+                Sockets: {
+                    create: {
+                        socketId: socket.id,
+                        username: username
                     }
                 }
             }
         });
-
-
-
-        res.json({
-            sessionId: session.sessionId,
-            sessionDescription: pushTracksResponse?.sessionDescription,
-            remotes: room.Sessions.filter((s) => s.sessionId !== session.sessionId)
-        });
-    } catch (err) {
-        console.log(err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-app.get('/get-session/:sessionId', async (req, res) => {
-    try {
-        const { sessionId } = req.params;
-        const session = await prisma.session.findFirst({
-            where: {
-                sessionId: sessionId
-            },
-            include: {
-                Tracks: true
-            }
-        });
-
-        if(!session) {
-            res.status(404).send('Session not found');
-            return;
-        }
-
-        res.json(session);
-    } catch (err) {
-        console.log(err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-io.on('connection', (socket) => {
-    console.log('a user connected');
-    socket.on('join-room', async ({roomId, sessionId}) => {
-        console.log('join-room', roomId, sessionId);
-        socket.join(roomId);
-        socket.to(roomId).emit('user-connected', sessionId);
-        const session = await prisma.session.findFirst({
-            where: {
-                sessionId: sessionId
-            }
-        });
-
-        if(!session) {
-            console.log('Session not found');
-            return;
-        }
-
-        await prisma.session.update({
-            where: {
-                sessionId: sessionId
-            },
-            data: {
-                socketId: socket.id
-            }
+        socket.to(roomId).emit('user-connected', {
+            socketId: socket.id,
+            username: username
         });
     });
 
-    socket.on('disconnect', async() => {
+    socket.on('offer', ({ socketId, offer, username }) => {
+        console.log('offer', socketId);
+        socket.to(socketId).emit('offer', {
+            by: socket.id,
+            offer: offer,
+            username: username
+        });
+    });
 
-        const session = await prisma.session.findFirst({
+    socket.on('answer', ({ socketId, answer }) => {
+        console.log('answer', socketId);
+        socket.to(socketId).emit('answer', {
+            by: socket.id,
+            answer: answer
+        });
+    });
+
+    socket.on('ice-candidate', ({ socketId, candidate }) => {
+        console.log('ice-candidate', socketId);
+        socket.to(socketId).emit('ice-candidate', {
+            by: socket.id,
+            candidate: candidate
+        });
+    });
+
+    socket.on('disconnect', async () => {
+
+        const session = await prisma.socket.findUnique({
             where: {
                 socketId: socket.id
             }
         });
 
-        if(!session) {
+        if (!session) {
             console.log('Session not found');
             return;
         }
-        console.log('user disconnected',session?.sessionId);
-        socket.to(session.roomId).emit('user-disconnected', session.sessionId);
+        console.log('user disconnected', session.socketId);
+        socket.broadcast.to(session.roomId).emit('user-disconnected', session.socketId);
         await prisma.room.update({
             where: {
                 id: session.roomId
@@ -240,21 +162,15 @@ io.on('connection', (socket) => {
             }
         });
 
-        await prisma.tracks.deleteMany({
+        await prisma.socket.delete({
             where: {
-                sessionId: session.sessionId
-            }
-        });
-
-        await prisma.session.delete({
-            where: {
-                sessionId: session.sessionId
+                socketId: socket.id
             },
         });
     });
 });
 
-server.listen(8000,'0.0.0.0', () => {
+server.listen(8000, '0.0.0.0', () => {
     console.log('listening on *:8000');
-  });
+});
 

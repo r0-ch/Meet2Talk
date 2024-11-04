@@ -19,26 +19,18 @@ model Room {
   maxUsers  Int      @default(5)
   private   Boolean  @default(false)
   password  String?
-  Sessions   Session[]
+  Sockets   Socket[]
 }
 
-model Session {
+model Socket {
   room      Room     @relation(fields: [roomId], references: [id])
-  sessionId String   @id
   roomId    String
-  socketId  String?
-  Tracks    Tracks[]
+  socketId  String   @id
+  username  String   @default("Guest")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Tracks {
-  id        String   @id
-  Session  Session  @relation(fields: [sessionId], references: [sessionId])
-  sessionId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
 
 model Reports {
   id        String   @id @default(cuid())
