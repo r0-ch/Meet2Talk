@@ -282,19 +282,39 @@ const ChatRoom = () => {
 
     // Get and return the local stream
     const getLocalStream = async () => {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
-        });
+        try {
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true,
+            });
 
-        return mediaStream;
+            // Vérification des pistes disponibles
+            const hasVideoTrack = mediaStream.getVideoTracks().length > 0;
+            const hasAudioTrack = mediaStream.getAudioTracks().length > 0;
+
+            if (!hasVideoTrack || !hasAudioTrack) {
+                console.warn("Aucune piste vidéo ou audio disponible");
+            }
+
+            return mediaStream;
+        } catch (err) {
+            console.error("Erreur d'accès aux périphériques:", err);
+            return new MediaStream(); // Retourne un flux vide
+        }
     };
 
     // Handle the local stream and set it to the local video element
     const handleLocalStream = (localStream: MediaStream) => {
         return new Promise<void>((resolve) => {
             if (localVideoElement.current) {
-                localVideoElement.current.srcObject = localStream;
+                if (localStream.getVideoTracks().length > 0) {
+                    // Si une vidéo est disponible, on l’affiche
+                    localVideoElement.current.srcObject = localStream;
+                } else {
+                    // Sinon, on masque le conteneur
+                    localVideoElement.current.style.display = "none";
+                    resolve();
+                }
 
                 localVideoElement.current.onloadedmetadata = () => {
                     resolve();
@@ -303,18 +323,29 @@ const ChatRoom = () => {
         });
     };
 
+
     async function startCall(socketId: string) {
         const media = await getLocalStream();
         console.log('startCall', socketId);
         const peerConnection = await createPeerConnection();
         const dc = peerConnection.createDataChannel("chat");
-        media.getTracks().forEach((track) => {
-            peerConnection.addTrack(track, media);
-        });
+
+        if (media.getTracks().length > 0) {
+            // Ajouter toutes les pistes disponibles (audio et/ou vidéo)
+            media.getTracks().forEach((track) => {
+                peerConnection.addTrack(track, media);
+            });
+        } else {
+            // Si aucune piste n'est disponible, ajouter un transceiver en mode recvonly
+            console.warn("Aucune piste locale, configuration en mode recv-only.");
+            peerConnection.addTransceiver("audio", { direction: "recvonly" });
+            peerConnection.addTransceiver("video", { direction: "recvonly" });
+        }
+
         // Crée l'offre APRÈS avoir ajouté les transceivers
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
-
+        console.log('OFFER', offer);
         socketRef.current?.emit("offer", {
             socketId: socketId,
             offer: peerConnection.localDescription,
