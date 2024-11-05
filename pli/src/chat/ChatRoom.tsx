@@ -47,7 +47,7 @@ const ChatRoom = () => {
     };
 
     useEffect(() => {
-        const socket = io(`${process.env.REACT_APP_BACKEND}`, {
+        const socket = io(`${new URL(process.env.REACT_APP_BACKEND as string).origin}`, {
             withCredentials: true,
         });
         console.log(`api: ${process.env.REACT_APP_BACKEND}`);
