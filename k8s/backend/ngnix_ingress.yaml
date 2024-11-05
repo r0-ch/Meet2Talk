@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udp-services
+data:
+  "2000": "backend-svc:2000"
+  "2001": "backend-svc:2001"
+  "2002": "backend-svc:2002"
+  "2003": "backend-svc:2003"
+  "2004": "backend-svc:2004"
+  "2005": "backend-svc:2005"
+  "2006": "backend-svc:2006"
+  "2007": "backend-svc:2007"
+  "2008": "backend-svc:2008"
