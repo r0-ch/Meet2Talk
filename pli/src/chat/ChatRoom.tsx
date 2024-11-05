@@ -391,42 +391,23 @@ const ChatRoom = () => {
 
     async function createPeerConnection() {
 
-        const response =
-  await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/785369f4bacaadc93151ced64f395b80/credentials/generate",{
-    method: "POST",
-    headers: {
-        Authorization: "Bearer a5e6faf386390a06a24b2fd1d411b3f20e8ee3b0537b4265edc88286b9ab502d",
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ ttl: 86400 })
-  });
-
-// Saving the response in the iceServers array
-const iceServers = await response.json();
-
-// Using the iceServers array in the RTCPeerConnection method
-var peerConnection = new RTCPeerConnection({
-  iceServers: {
-    ...iceServers
-  }
-});
-        // const peerConnection = new RTCPeerConnection({
-        //     iceServers: [
-        //         {
-        //             urls: "stun:stun.relay.metered.ca:80"
-        //         },
-        //         { urls: "stun:stun.l.google.com:19302" },
-        //         { urls: "stun:stun.l.google.com:5349" },
-        //         { urls: "stun:stun1.l.google.com:3478" },
-        //         { urls: "stun:stun1.l.google.com:5349" },
-        //         { urls: "stun:stun2.l.google.com:19302" },
-        //         { urls: "stun:stun2.l.google.com:5349" },
-        //         { urls: "stun:stun3.l.google.com:3478" },
-        //         { urls: "stun:stun3.l.google.com:5349" },
-        //         { urls: "stun:stun4.l.google.com:19302" },
-        //         { urls: "stun:stun4.l.google.com:5349" }
-        //     ]
-        // });
+        const peerConnection = new RTCPeerConnection({
+            iceServers: [
+                {
+                    urls: "stun:stun.relay.metered.ca:80"
+                },
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun.l.google.com:5349" },
+                // { urls: "stun:stun1.l.google.com:3478" },
+                // { urls: "stun:stun1.l.google.com:5349" },
+                // { urls: "stun:stun2.l.google.com:19302" },
+                // { urls: "stun:stun2.l.google.com:5349" },
+                // { urls: "stun:stun3.l.google.com:3478" },
+                // { urls: "stun:stun3.l.google.com:5349" },
+                // { urls: "stun:stun4.l.google.com:19302" },
+                // { urls: "stun:stun4.l.google.com:5349" }
+            ]
+        });
         return peerConnection;
     }
     // return (
