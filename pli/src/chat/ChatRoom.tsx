@@ -401,21 +401,6 @@ const ChatRoom = () => {
                     username: "8d3c8253cd46b3f0183a2839",
                     credential: "ugvGPlGuh7A8zVjI",
                   },
-                  {
-                    urls: "turn:europe.relay.metered.ca:80?transport=tcp",
-                    username: "8d3c8253cd46b3f0183a2839",
-                    credential: "ugvGPlGuh7A8zVjI",
-                  },
-                  {
-                    urls: "turn:europe.relay.metered.ca:443",
-                    username: "8d3c8253cd46b3f0183a2839",
-                    credential: "ugvGPlGuh7A8zVjI",
-                  },
-                  {
-                    urls: "turns:europe.relay.metered.ca:443?transport=tcp",
-                    username: "8d3c8253cd46b3f0183a2839",
-                    credential: "ugvGPlGuh7A8zVjI",
-                  }
             ]
         });
         return peerConnection;
