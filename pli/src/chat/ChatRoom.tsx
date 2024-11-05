@@ -390,23 +390,33 @@ const ChatRoom = () => {
     }
 
     async function createPeerConnection() {
-        const peerConnection = new RTCPeerConnection({
-            iceServers: [
-                {
-                    urls: "stun:stun.relay.metered.ca:80"
-                },
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun.l.google.com:5349" },
-                { urls: "stun:stun1.l.google.com:3478" },
-                { urls: "stun:stun1.l.google.com:5349" },
-                { urls: "stun:stun2.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:5349" },
-                { urls: "stun:stun3.l.google.com:3478" },
-                { urls: "stun:stun3.l.google.com:5349" },
-                { urls: "stun:stun4.l.google.com:19302" },
-                { urls: "stun:stun4.l.google.com:5349" }
-            ]
-        });
+        const response =
+  await fetch("https://pli.metered.live/api/v1/turn/credentials?apiKey=51121771a753f137973ee383adf295cf2ffa");
+
+// Saving the response in the iceServers array
+const iceServers = await response.json();
+
+// Using the iceServers array in the RTCPeerConnection method
+var peerConnection = new RTCPeerConnection({
+  iceServers: iceServers
+});
+        // const peerConnection = new RTCPeerConnection({
+        //     iceServers: [
+        //         {
+        //             urls: "stun:stun.relay.metered.ca:80"
+        //         },
+        //         { urls: "stun:stun.l.google.com:19302" },
+        //         { urls: "stun:stun.l.google.com:5349" },
+        //         { urls: "stun:stun1.l.google.com:3478" },
+        //         { urls: "stun:stun1.l.google.com:5349" },
+        //         { urls: "stun:stun2.l.google.com:19302" },
+        //         { urls: "stun:stun2.l.google.com:5349" },
+        //         { urls: "stun:stun3.l.google.com:3478" },
+        //         { urls: "stun:stun3.l.google.com:5349" },
+        //         { urls: "stun:stun4.l.google.com:19302" },
+        //         { urls: "stun:stun4.l.google.com:5349" }
+        //     ]
+        // });
         return peerConnection;
     }
     // return (
