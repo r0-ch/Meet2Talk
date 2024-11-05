@@ -7,7 +7,7 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
-
+ENV REACT_APP_BACKEND=https://pli.ketsuna.com
 RUN npm run build
 
 FROM nginx:stable
