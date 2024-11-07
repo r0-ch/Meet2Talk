@@ -7,19 +7,16 @@ stages:
 # Job pour construire l'application (front et/ou back)
 build_job:
   stage: build
-  image: docker:latest
+  image: gcr.io/kaniko-project/executor:latest
   services:
   - docker:dind
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+    CI_REGISTRY: "docker.io"
   script:
   - echo "Construction de l'application..."
-  - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
-  - docker build --build-arg EACT_APP_BACKEND=https://pli-dev.ketsuna.com -t crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA} ./pli
-  - docker build --build-arg CORS_ORIGIN=https://pli-dev.ketsuna.com  -t crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA} ./signaling
-  - docker push crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA}
-  - docker push crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA}
+  - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+  - /kaniko/executor --context ./pli --dockerfile Dockerfile --destination crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA}
+  - /kaniko/executor --context ./signaling --dockerfile Dockerfile --destination crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA}
 
 
 deploy_to_dev:
