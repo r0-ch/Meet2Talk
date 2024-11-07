@@ -1,13 +1,28 @@
-
 stages:
+  - build
+  - deploy
 
-    - test
+# Job pour construire l'application (front et/ou back)
+build_job:
+  stage: build
+  script:
+    - echo "Construction de l'application..."
+    - docker build --build-arg EACT_APP_BACKEND=https://pli-dev.ketsuna.com -t crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA} ./pli
+    - docker build --build-arg CORS_ORIGIN=https://pli-dev.ketsuna.com  -t crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA} ./signaling
+    - docker push crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA}
+    - docker push crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA}
+  only:
+    - /^test-k8s$/
+  except:
+    - master
 
-
-neo:
-    stage: test
-    image: 
-        name : alpine:latest
-    script:
-      echo "hello world"
-      
+deploy_to_dev:
+  stage: deploy
+  script:
+    - echo "Déploiement sur l'environnement de développement..."
+    - kubectl apply -f k8s-dev/front --namespace=dev
+    - kubectl apply -f k8s-dev/back --namespace=dev
+  only:
+    - /^test-k8s$/
+  except:
+    - master
