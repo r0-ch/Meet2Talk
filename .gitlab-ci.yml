@@ -7,7 +7,7 @@ stages:
 # Job pour construire l'application (front et/ou back)
 build_job:
   stage: build
-  image: gcr.io/kaniko-project/executor:latest
+  image: gcr.io/kaniko-project/executor:v1.23.2-debug
   script:
   - echo "Construction de l'application..."
   - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
