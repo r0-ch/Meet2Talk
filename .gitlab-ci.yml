@@ -6,7 +6,7 @@ deploy_to_dev:
   stage: deploy
   image: bitnami/kubectl:latest
   script:
-  - echo "$KUBECONFIG_DATA" | base64 -d > kubeconfig
+  - echo "$KUBECONFIG_DATA" kubeconfig
   - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
   - echo "Déploiement sur l'environnement de développement..."
   - kubectl apply -f k8s-dev/front --namespace=dev
