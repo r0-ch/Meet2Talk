@@ -9,24 +9,47 @@ interface RemoteParticipant {
     username: string;
     dataChannel?: RTCDataChannel;
     tracks?: MediaStreamTrack[];
+    profilePicture: string;
 }
+
+
+let iceServers: any[] = []
+
+async function loadIceServers() {
+    const response =
+        await fetch("https://rtc.live.cloudflare.com/v1/turn/keys/785369f4bacaadc93151ced64f395b80/credentials/generate", {
+            method: "POST",
+            headers: {
+                Authorization: "Bearer a5e6faf386390a06a24b2fd1d411b3f20e8ee3b0537b4265edc88286b9ab502d",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ ttl: 86400 })
+        });
+    const res = await response.json();
+
+    iceServers = [{
+        urls: "stun:stun.relay.metered.ca:80",
+    },
+    {
+        ...res.iceServers
+    }]
+}
+
+const remoteParticipants = new Map<string, RemoteParticipant>();
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
-    const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
     const [messages, setMessages] = useState<{ socketId: string, username: string, message: string, translated: string | null }[]>([]);
     const [currentMessage, setCurrentMessage] = useState('');
-    // const [messages, setMessages] = useState<{ text: string; user: number }[]>([]);
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
+    const [remotes, setRemotes] = useState<RemoteParticipant[]>([]);
     const [translationEnabled, setTranslationEnabled] = useState(false);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
-    const LocalPeerConnection = useRef<RTCPeerConnection | null>(null);
-    const dataChannel = useRef<RTCDataChannel | null>(null);
     const localVideoElement = useRef<HTMLVideoElement | null>(null);
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
@@ -52,6 +75,7 @@ const ChatRoom = () => {
         });
         console.log(`api: ${process.env.REACT_APP_BACKEND}`);
         socketRef.current = socket;
+        setProfilePictures(getRandomProfiles());
         socket.on("connect_error", (err) => {
             console.log('connect_error', err);
             socket.io.opts.transports = ["polling", "websocket"];
@@ -62,127 +86,48 @@ const ChatRoom = () => {
         // });
 
         socket.on("connect", async () => {
+            await loadIceServers();
             localSocketIdRef.current = socket.id!;
             console.log('socket connected', socket.id);
             const media = await getLocalStream();
             await handleLocalStream(media);
             const { Sockets } = await fetch(`${process.env.REACT_APP_BACKEND}/get-room/${roomId}`).then((res) => res.json()) as { Sockets: { socketId: string, username: string }[] };
-            const remoteParticipants: RemoteParticipant[] = [];
 
             socket.emit("join-room", {
                 roomId,
                 username,
             });
 
-
             socket.on("offer", async ({ by, offer, username }) => {
-                console.log('offer', by, offer, username);
-                const peerConnection = await createPeerConnection();
-                await peerConnection.setRemoteDescription(offer);
+                handleOffer(offer, by, username);
+            });
 
-                // send Video
-                const media = await getLocalStream();
-                media.getTracks().forEach((track) => {
-                    peerConnection.addTrack(track, media);
-                });
+            socket.on("answer", (data) => {
+                handleAnswer(data.answer, data.by);
+            });
 
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-
-                socket.emit("answer", {
-                    socketId: by,
-                    answer,
-                });
-
-                peerConnection.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        socket.emit("ice-candidate", {
-                            candidate: event.candidate,
-                            socketId: by,
-                        });
-                    }
-                };
-
-                let dc: RTCDataChannel = null!;
-                const remoteParticipant: RemoteParticipant = {
-                    peerConnection,
-                    socketId: by,
-                    username,
-                    tracks: peerConnection.getTransceivers().map((t) => t.receiver.track),
-                };
-
-                peerConnection.ondatachannel = (event) => {
-                    dc = event.channel;
-                    dc.onmessage = (event) => {
-                        const message = JSON.parse(event.data);
-                        if (message.socketId === localSocketIdRef.current) return;
-                        setMessages((prevMessages) => [...prevMessages, message]);
-                    };
-
-                    dc.onopen = () => {
-                        console.log('data channel open');
-                        remoteParticipant.dataChannel = dc;
-
-                        setRemoteParticipants((prevParticipants) => {
-                            const index = prevParticipants.findIndex((participant) => participant.socketId === by);
-                            prevParticipants[index] = remoteParticipant;
-                            return prevParticipants;
-                        });
-                    };
-                };
-
-                setRemoteParticipants((prevParticipants) => [...prevParticipants, remoteParticipant]);
-
-                // peerConnection.ontrack = (event) => {
-                //     remoteParticipant.tracks = event.streams[0].getTracks();
-                //     setRemoteParticipants((prevParticipants) => {
-                //         const index = prevParticipants.findIndex((participant) => participant.socketId === by);
-                //         prevParticipants[index] = remoteParticipant;
-                //         return prevParticipants;
-                //     });
-                // };
-
+            socket.on("ice-candidate", (data) => {
+                handleIceCandidate(data.candidate, data.by);
             });
 
             socket.on("user-disconnected", (socketId: string) => {
                 console.log('user disconnected', socketId);
-                const peerToDisconnect = remoteParticipants.find((participant) => participant.socketId === socketId);
+                const peerToDisconnect = remoteParticipants.get(socketId);
                 if (peerToDisconnect) {
                     peerToDisconnect.peerConnection.close();
                 }
 
-                setRemoteParticipants((prevParticipants) => prevParticipants.filter((participant) => participant.socketId !== socketId));
+                remoteParticipants.delete(socketId);
+                setRemotes((prev) => prev.filter((remote) => remote.socketId !== socketId));
             });
 
+            if (Sockets.length === 0) {
+                console.log("You'r the Host of this room !");
+            } else {
+                console.log("You'r not the Host of this room !");
+            }
             Sockets.forEach(async ({ socketId, username }) => {
-                const { peerConnection, dataChannel } = await startCall(socketId);
-
-                const remoteParticipant: RemoteParticipant = {
-                    peerConnection,
-                    socketId,
-                    username: username,
-                    dataChannel,
-                };
-
-                remoteParticipant.tracks = peerConnection.getTransceivers().map((t) => t.receiver.track);
-                remoteParticipants.push(remoteParticipant);
-
-                // peerConnection.ontrack = (event) => {
-                //     remoteParticipant.tracks = event.streams[0].getTracks();
-                //     setRemoteParticipants((prevParticipants) => {
-                //         const index = prevParticipants.findIndex((participant) => participant.socketId === socketId);
-                //         prevParticipants[index] = remoteParticipant;
-                //         return prevParticipants;
-                //     });
-                // };
-
-                dataChannel.onmessage = (event) => {
-                    const message = JSON.parse(event.data);
-                    if (message.socketId === localSocketIdRef.current) return;
-                    setMessages((prevMessages) => [...prevMessages, message]);
-                };
-
-                setRemoteParticipants(remoteParticipants);
+                connectToSocket(socketId, username, media);
             });
         });
 
@@ -196,7 +141,272 @@ const ChatRoom = () => {
     }, []);
 
 
+    async function connectToSocket(socketId: string, name: string, stream: MediaStream) {
+        if (iceServers.length === 0) {
+            await loadIceServers();
+        }
 
+        const peerConnection = await createPeerConnection();
+
+        const dataChannel = peerConnection.createDataChannel("chat");
+
+
+        dataChannel.onopen = () => {
+            console.log("Data channel is open with", socketId);
+        };
+
+        dataChannel.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.socketId === localSocketIdRef.current) return;
+            setMessages((prevMessages) => [...prevMessages, message]);
+        }
+
+        dataChannel.onclose = () => {
+            console.log("Data channel closed with", socketId);
+        };
+
+
+        for (const track of stream.getTracks()) {
+            peerConnection.addTrack(track, stream);
+        }
+
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socketRef.current?.emit("ice-candidate", {
+                    candidate: event.candidate,
+                    socketId,
+                });
+            }
+        }
+
+        peerConnection.ontrack = (event) => {
+            const remoteParticipant = remoteParticipants.get(socketId);
+            if (remoteParticipant) {
+                remoteParticipant.tracks = event.streams[0].getTracks();
+                remoteParticipants.set(socketId, remoteParticipant);
+                setRemotes((prev) => [...prev, remoteParticipant]);
+            }
+        }
+
+        remoteParticipants.set(socketId, {
+            peerConnection,
+            socketId,
+            profilePicture: getRandomProfiles()[0],
+            username: name,
+            dataChannel,
+        });
+        setRemotes((prev) => [...prev, {
+            peerConnection,
+            socketId,
+            username: name,
+            dataChannel,
+            profilePicture: getRandomProfiles()[0],
+        }]);
+
+        peerConnection.addEventListener("iceconnectionstatechange", async (event) => {
+            if (peerConnection.iceConnectionState === "disconnected") {
+                /* possibly reconfigure the connection in some way here */
+                /* then request ICE restart */
+                peerConnection.restartIce();
+            } else if (peerConnection.iceConnectionState === "closed") {
+                console.log("ICE CONNECTION CLOSED", socketId);
+                const remoteParticipant = remoteParticipants.get(socketId);
+                if (remoteParticipant) {
+                    remoteParticipant.peerConnection.close();
+                    remoteParticipants.delete(socketId);
+                    setRemotes((prev) => prev.filter((remote) => remote.socketId !== socketId));
+                }
+            }
+        });
+
+        peerConnection.onnegotiationneeded = async () => {
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            console.log("OFFER SENT BECAUSE OF NEGOTIATION NEEDED", socketId);
+            socketRef.current?.emit("offer", {
+                socketId,
+                offer,
+                username,
+            });
+        }
+
+
+    }
+
+    async function handleOffer(offer: RTCSessionDescriptionInit, socketId: string, username: string) {
+        console.log("OFFER RECEIVED", socketId);
+        const peerConnection = await getOrCreatePeerConnection(socketId, username);
+
+        peerConnection
+            .setRemoteDescription(offer)
+            .then(() =>
+                getLocalStream()
+            ).then((media) => {
+                for (const track of media.getTracks()) {
+                    peerConnection.addTrack(track, media);
+                }
+                return peerConnection.createAnswer();
+            }).then((answer) => {
+                return peerConnection.setLocalDescription(answer);
+            }).then(() => {
+                socketRef.current?.emit("answer", {
+                    socketId,
+                    answer: peerConnection.localDescription,
+                });
+                console.log("ANSWER SENT", socketId);
+            });
+
+    }
+
+
+    // Leave the room
+
+    // Get and return the local stream
+    const getLocalStream = async () => {
+        try {
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true,
+            });
+
+            // Vérification des pistes disponibles
+            const hasVideoTrack = mediaStream.getVideoTracks().length > 0;
+            const hasAudioTrack = mediaStream.getAudioTracks().length > 0;
+
+            if (!hasVideoTrack || !hasAudioTrack) {
+                console.warn("Aucune piste vidéo ou audio disponible");
+            }
+
+            return mediaStream;
+        } catch (err) {
+            console.error("Erreur d'accès aux périphériques:", err);
+            return new MediaStream(); // Retourne un flux vide
+        }
+    };
+
+    // Handle the local stream and set it to the local video element
+    const handleLocalStream = (localStream: MediaStream) => {
+        return new Promise<void>((resolve) => {
+            if (localVideoElement.current) {
+                if (localStream.getVideoTracks().length > 0) {
+                    // Si une vidéo est disponible, on l’affiche
+                    localVideoElement.current.srcObject = localStream;
+                } else {
+                    // Sinon, on masque le conteneur
+                    localVideoElement.current.style.display = "none";
+                    resolve();
+                }
+
+                localVideoElement.current.onloadedmetadata = () => {
+                    resolve();
+                };
+            }
+        });
+    };
+
+
+    function handleAnswer(answer: RTCSessionDescriptionInit, socketId: string) {
+        const peerConnection = remoteParticipants.get(socketId)?.peerConnection;
+        if (peerConnection) {
+            peerConnection.setRemoteDescription(answer);
+        }
+    }
+
+    async function getOrCreatePeerConnection(socketId: string, name: string) {
+        const peer = remoteParticipants.get(socketId);
+        if (peer) {
+            return peer.peerConnection;
+        }
+        if (iceServers.length === 0) {
+            await loadIceServers();
+        }
+        const peerConnection = await createPeerConnection();
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socketRef.current?.emit("ice-candidate", {
+                    candidate: event.candidate,
+                    socketId,
+                });
+            }
+        }
+
+        peerConnection.ontrack = (event) => {
+            const remoteParticipant = remoteParticipants.get(socketId);
+            if (remoteParticipant) {
+                remoteParticipant.tracks = event.streams[0].getTracks();
+                remoteParticipants.set(socketId, remoteParticipant);
+                setRemotes((prev) => [...prev, remoteParticipant]);
+            }
+        }
+
+        remoteParticipants.set(socketId, {
+            peerConnection,
+            profilePicture: getRandomProfiles()[0],
+            socketId,
+            username: name,
+            tracks: peerConnection.getReceivers().map((receiver) => receiver.track),
+        });
+
+        setRemotes((prev) => [...prev, {
+            peerConnection,
+            profilePicture: getRandomProfiles()[0],
+            socketId,
+            username: name,
+            tracks: peerConnection.getReceivers().map((receiver) => receiver.track),
+        }]);
+        peerConnection.ondatachannel = (event) => {
+            const dc = event.channel;
+            dc.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                if (message.socketId === localSocketIdRef.current) return;
+                setMessages((prevMessages) => [...prevMessages, message]);
+            }
+
+            dc.onopen = () => {
+                const remoteParticipant = remoteParticipants.get(socketId);
+                if (remoteParticipant) {
+                    remoteParticipant.dataChannel = dc;
+                    remoteParticipants.set(socketId, remoteParticipant);
+                }
+            }
+        }
+
+        peerConnection.addEventListener("iceconnectionstatechange", async (event) => {
+            if (peerConnection.iceConnectionState === "disconnected") {
+                console.log("Reconnecting...");
+                peerConnection.restartIce();
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                console.log("OFFER SENT BECAUSE OF DISCONNECTION", socketId);
+                socketRef.current?.emit("offer", {
+                    socketId,
+                    offer: peerConnection.localDescription,
+                    username,
+                });
+            }
+        });
+
+        return peerConnection;
+    }
+
+    function handleIceCandidate(candidate: RTCIceCandidate, socketId: string) {
+        const peerConnection = remoteParticipants.get(socketId)?.peerConnection;
+        console.log("ICE CANDIDATE FROM REMOTE", socketId, candidate, Array.from(remoteParticipants).map((p) => p[1]));
+        if (peerConnection) {
+            console.log("ICE CANDIDATE RECEIVED", socketId, candidate);
+            peerConnection.addIceCandidate(candidate);
+        }
+    }
+
+    async function createPeerConnection() {
+
+        const peerConnection = new RTCPeerConnection({
+            iceServers: iceServers,
+            iceCandidatePoolSize: 2,
+            iceTransportPolicy: "relay",
+        });
+        return peerConnection;
+    }
 
     async function translate(text: string, target: string = "en") {
         return new Promise<string | null>(async (resolve, reject) => {
@@ -278,150 +488,6 @@ const ChatRoom = () => {
         scrollToBottom();
     }, [messages]);
 
-    // Leave the room
-
-    // Get and return the local stream
-    const getLocalStream = async () => {
-        try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true,
-            });
-
-            // Vérification des pistes disponibles
-            const hasVideoTrack = mediaStream.getVideoTracks().length > 0;
-            const hasAudioTrack = mediaStream.getAudioTracks().length > 0;
-
-            if (!hasVideoTrack || !hasAudioTrack) {
-                console.warn("Aucune piste vidéo ou audio disponible");
-            }
-
-            return mediaStream;
-        } catch (err) {
-            console.error("Erreur d'accès aux périphériques:", err);
-            return new MediaStream(); // Retourne un flux vide
-        }
-    };
-
-    // Handle the local stream and set it to the local video element
-    const handleLocalStream = (localStream: MediaStream) => {
-        return new Promise<void>((resolve) => {
-            if (localVideoElement.current) {
-                if (localStream.getVideoTracks().length > 0) {
-                    // Si une vidéo est disponible, on l’affiche
-                    localVideoElement.current.srcObject = localStream;
-                } else {
-                    // Sinon, on masque le conteneur
-                    localVideoElement.current.style.display = "none";
-                    resolve();
-                }
-
-                localVideoElement.current.onloadedmetadata = () => {
-                    resolve();
-                };
-            }
-        });
-    };
-
-
-    async function startCall(socketId: string) {
-        const media = await getLocalStream();
-        console.log('startCall', socketId);
-        const peerConnection = await createPeerConnection();
-        const dc = peerConnection.createDataChannel("chat");
-
-        if (media.getTracks().length > 0) {
-            // Ajouter toutes les pistes disponibles (audio et/ou vidéo)
-            media.getTracks().forEach((track) => {
-                peerConnection.addTrack(track, media);
-            });
-        } else {
-            // Si aucune piste n'est disponible, ajouter un transceiver en mode recvonly
-            console.warn("Aucune piste locale, configuration en mode recv-only.");
-            peerConnection.addTransceiver("audio", { direction: "recvonly" });
-            peerConnection.addTransceiver("video", { direction: "recvonly" });
-        }
-
-        // Crée l'offre APRÈS avoir ajouté les transceivers
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        console.log('OFFER', offer);
-        socketRef.current?.emit("offer", {
-            socketId: socketId,
-            offer: peerConnection.localDescription,
-            username,
-        });
-
-        socketRef.current?.on("answer", async (data) => {
-            if (socketId !== data.by) return;
-            console.log('ANSWER', data);
-            await peerConnection.setRemoteDescription(data.answer);
-        });
-
-
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socketRef.current?.emit("ice-candidate", {
-                    candidate: event.candidate,
-                    socketId,
-                });
-            }
-        }
-
-        socketRef.current?.on("ice-candidate", async (data) => {
-            if (socketId !== data.by) return;
-            console.log('ICE CANDIDATE', data);
-            await peerConnection.addIceCandidate(data.candidate);
-        });
-
-        peerConnection.onnegotiationneeded = async () => {
-            console.log('negotiation needed');
-            console.log(peerConnection.iceConnectionState);
-        }
-
-        peerConnection.onconnectionstatechange = () => {
-            console.log('connection state', peerConnection.connectionState);
-        }
-
-        return {
-            peerConnection,
-            dataChannel: dc,
-        }
-    }
-
-    async function createPeerConnection() {
-
-        const peerConnection = new RTCPeerConnection({
-            iceServers: [
-                {
-                    urls: "stun:stun.relay.metered.ca:80",
-                  },
-                  {
-                    urls: "turn:europe.relay.metered.ca:80",
-                    username: "8d3c8253cd46b3f0183a2839",
-                    credential: "ugvGPlGuh7A8zVjI",
-                  },
-                  {
-                    urls: "turn:europe.relay.metered.ca:80?transport=tcp",
-                    username: "8d3c8253cd46b3f0183a2839",
-                    credential: "ugvGPlGuh7A8zVjI",
-                  },
-                  {
-                    urls: "turn:europe.relay.metered.ca:443",
-                    username: "8d3c8253cd46b3f0183a2839",
-                    credential: "ugvGPlGuh7A8zVjI",
-                  },
-                  {
-                    urls: "turns:europe.relay.metered.ca:443?transport=tcp",
-                    username: "8d3c8253cd46b3f0183a2839",
-                    credential: "ugvGPlGuh7A8zVjI",
-                  },
-            ],
-            iceCandidatePoolSize: 2,
-            iceTransportPolicy: "relay",
-        });
-        return peerConnection;
-    }
     // return (
     //     <div>
     //         <h1>Room: {roomId}</h1>
@@ -470,8 +536,8 @@ const ChatRoom = () => {
                     <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
                     <ul className="space-y-2">
                         <li className="text-white">{username}</li>
-                        {remoteParticipants.length > 0 && remoteParticipants.map((user, index) => (
-                            <li key={index} className="text-white">{user.username}</li>
+                        {remoteParticipants.size > 0 && Array.from(remoteParticipants).map((user, index) => (
+                            <li key={index} className="text-white">{user[1].username}</li>
                         ))}
                     </ul>
                 </div>
@@ -505,21 +571,30 @@ const ChatRoom = () => {
                     {!isChatExpanded && (
                         <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
                             <video autoPlay controls ref={localVideoElement} className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
-
-                            {remoteParticipants.length > 0 && remoteParticipants.map((remote, index) => {
+                            {localVideoElement.current && localVideoElement.current.style.display === "none" && (
+                                <img src={profilePictures[0]} alt="Yourself" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
+                            )}
+                            {remotes.map((remote, index) => {
                                 const mediaStream = new MediaStream();
                                 remote.tracks?.forEach((track) => {
                                     mediaStream.addTrack(track);
                                 });
 
-                                return (
-                                    <video className="w-[25%] h-[100%] border border-gray-600 rounded-md"
-                                        key={index} ref={video => {
-                                            if (video) { video.srcObject = mediaStream; video.dataset.socketId = remote.socketId; }
-                                        }} autoPlay controls>
-                                    </video>
-                                );
-
+                                if (remote.tracks && remote.tracks.length > 0) {
+                                    return (
+                                        <video className="w-[25%] h-[100%] border border-gray-600 rounded-md"
+                                            key={index} ref={video => {
+                                                if (video) { video.srcObject = mediaStream; video.dataset.socketId = remote.socketId; }
+                                            }} autoPlay controls>
+                                        </video>
+                                    );
+                                } else {
+                                    return (
+                                        <img
+                                            key={index}
+                                            src={remote.profilePicture} alt={remote.username} className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
+                                    )
+                                }
                             })}
                         </div>
                     )}

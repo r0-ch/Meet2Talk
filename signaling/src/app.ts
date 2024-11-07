@@ -113,7 +113,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('offer', ({ socketId, offer, username }) => {
-        console.log('offer', socketId);
+        console.log('offer', username)
         socket.to(socketId).emit('offer', {
             by: socket.id,
             offer: offer,
