@@ -9,7 +9,7 @@ build_job:
   image: gcr.io/kaniko-project/executor:v1.23.2-debug
   script:
   - echo "Construction de l'application..."
-  - echo "{\"auths\":{\"docker.io\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+  - - echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
   - cat /kaniko/.docker/config.json
   - /kaniko/executor --context ./pli --build-arg EACT_APP_BACKEND=https://pli-dev.ketsuna.com  --dockerfile Dockerfile --destination crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA}
   - /kaniko/executor --context ./signaling --build-arg CORS_ORIGIN=https://pli-dev.ketsuna.com  --dockerfile Dockerfile --destination crissime/pli-brack:dev-${CI_COMMIT_SHORT_SHA}
