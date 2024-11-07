@@ -1,3 +1,12 @@
+image: docker:20.10 # Image Docker globale pour tous les jobs nécessitant Docker
+
+services:
+- docker:20.10-dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+
 stages:
 - build
 - deploy
