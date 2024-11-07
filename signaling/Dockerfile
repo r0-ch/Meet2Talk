@@ -7,6 +7,7 @@ COPY tsconfig.json ./
 COPY prisma ./prisma
 
 ENV DATABASE_URL=file:./dev.db
+ENV CORS_ORIGIN=pli.ketsuna.com
 
 RUN npm install && npx prisma db push
 
