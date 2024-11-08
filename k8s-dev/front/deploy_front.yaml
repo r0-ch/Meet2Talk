@@ -14,10 +14,10 @@ spec:
       volumes:
       - name: cert
         secret:
-          secretName: mysecret
+          secretName: mysecret-dev
       - name: conf
         configMap:
-          name: conf-nginx
+          name: conf-nginx-dev
       containers:
       - name: front-dev
         image: ghcr.io/exatombe/pli-front:latest
