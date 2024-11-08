@@ -23,7 +23,7 @@ spec:
         image: ghcr.io/exatombe/pli-front:latest
         resources:
           limits:
-            memory: "2500Mi"
+            memory: "250Mi"
             cpu: "250m"
         ports:
         - containerPort: 80
