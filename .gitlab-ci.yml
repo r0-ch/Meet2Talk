@@ -8,7 +8,7 @@ deploy_to_dev:
   script:
   - echo "$KUBECONFIG_DATA" kubeconfig
   - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
-  - echo $KUBECONFIG
+  - cat $KUBECONFIG
   - echo "Déploiement sur l'environnement de développement..."
   - kubectl apply -f k8s-dev/front --namespace=dev
   - kubectl apply -f k8s-dev/back --namespace=dev
