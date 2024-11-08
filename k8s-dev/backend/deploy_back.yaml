@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: backend-dev
 spec:
   selector:
     matchLabels:
-      app: backend
+      app: backend-dev
   template:
     metadata:
       labels:
-        app: backend
+        app: backend-dev
     spec:
       volumes:
       - name: cert
         secret:
-          secretName: mysecret
+          secretName: mysecret-dev
       containers:
-      - name: backend
+      - name: backend-dev
         image: ghcr.io/exatombe/pli-back:latest
         resources:
           limits:
-            memory: "1000Mi"
-            cpu: "1"
+            memory: "250Mi"
+            cpu: "250m"
         ports:
         - containerPort: 8000
         env:

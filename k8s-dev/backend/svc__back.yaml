@@ -4,7 +4,7 @@ metadata:
   name: backend-svc-dev
 spec:
   selector:
-    app: backend
+    app: backend-dev
   ports:
   - port: 8000
     name: "http"
