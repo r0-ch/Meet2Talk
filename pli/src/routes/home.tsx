@@ -31,7 +31,7 @@ export default function Home() {
     setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
-  const handleSubmit = (e: any) => {
+  const handleSubmit = async(e: any) => {
     e.preventDefault();
     if (username.trim() === "") {
       setError("Please enter a username.");
@@ -43,8 +43,9 @@ export default function Home() {
     }
     setError("");
 
-    const roomId = generateRoomId();
-    navigate(`/room/${roomId}`, { state: { username, selectedLanguage } });
+    const room = await fetch(process.env.REACT_APP_BACKEND + "/get-room").then((res) => res.json());
+
+    navigate(`/room/${room.id}`, { state: { username, selectedLanguage } });
   };
 
   const toggleForm = () => {
