@@ -1,18 +1,23 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRightIcon, ChevronLeftIcon } from '@heroicons/react/24/solid';
 import React from "react";
+import backgroundImage from "../img/worldwide.jpg"; // Chemin vers une image neutre
 
 export default function Home() {
   const [username, setUsername] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("fr");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState(""); // État initial vide pour la langue
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [error, setError] = useState(""); // État pour afficher un message d'erreur
+  const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [showWelcomeBox, setShowWelcomeBox] = useState(true);
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const navigate = useNavigate();
 
-  // Fonction pour ajouter un tag
+  const generateRoomId = () => {
+    return Math.floor(1000000 + Math.random() * 9000000);
+  };
+
   const addTag = (e: any) => {
     e.preventDefault();
     if (tagInput && !tags.includes(tagInput)) {
@@ -21,129 +26,150 @@ export default function Home() {
     }
   };
 
-  // Fonction pour supprimer un tag
   const removeTag = (e: any, tagToRemove: string) => {
-    e.preventDefault(); // Empêche la soumission du formulaire
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    e.preventDefault();
+    setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
-  // Fonction pour gérer la soumission du formulaire
-  const handleSubmit = (e: any) => {
+  const handleSubmit = async(e: any) => {
     e.preventDefault();
     if (username.trim() === "") {
-      setError("Please enter a username."); // Afficher une erreur si le pseudo est vide
+      setError("Please enter a username.");
       return;
     }
-    setError(""); // Réinitialise l'erreur si le pseudo est valide
+    if (selectedLanguage === "") {
+      setError("Please choose a language.");
+      return;
+    }
+    setError("");
 
-    // Rediriger vers room/create en passant le username dans le state
-    navigate('room/create', { state: { username } });
+    const room = await fetch(process.env.REACT_APP_BACKEND + "/get-room").then((res) => res.json());
+
+    navigate(`/room/${room.id}`, { state: { username, selectedLanguage } });
+  };
+
+  const toggleForm = () => {
+    if (showForm) {
+      setIsAnimatingOut(true);
+      setTimeout(() => {
+        setShowForm(false);
+        setShowWelcomeBox(true);
+        setIsAnimatingOut(false);
+      }, 500);
+    } else {
+      setShowForm(true);
+      setShowWelcomeBox(false);
+    }
   };
 
   return (
-
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <div className={`${isSidebarOpen ? "w-64" : "w-0"} bg-gray-800 text-white flex flex-col p-6 transition-width duration-300 overflow-hidden border-r-2 border-indigo-600`}>
-        {isSidebarOpen && (
-          <>
-            <h2 className="text-2xl font-bold mb-8"><a href="/">Meet2Talk</a></h2>
-            <nav className="space-y-4 flex-grow">
-              <a href="#" className="block py-2 px-4 hover:bg-gray-700 rounded">
-                Settings
-              </a>
-              <a href="#" className="block py-2 px-4 hover:bg-gray-700 rounded">
-                About us
-              </a>
-
-            </nav>
-            <p className="block py-2 px-4 hover:bg-gray-700 rounded mt-auto">
-              © PLI Inc. Tous droits réservés.
-            </p>
-          </>
-        )}
-      </div>
-
-      {/* Sidebar Toggle Button */}
-      <div className="flex flex-col min-h-screen bg-gray-100">
-        <div className="flex-grow"></div> {/* Cet espace pousse le bouton vers le bas */}
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="bg-gray-700 text-white p-2 rounded mb-4 self-center hover:bg-gray-600 transition"
+    <div className="relative flex items-center justify-center min-h-screen">
+      <div
+        className="absolute inset-0 bg-cover bg-center animate-bg-scroll"
+        style={{
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: "200% 200%", // Pour donner un effet de défilement plus dynamique
+          filter: "blur(2px)",
+        }}
+      />
+      <div className="absolute inset-0 bg-black opacity-40" />{" "}
+      {/* Couche sombre */}
+      {showWelcomeBox && (
+        <div className="relative text-center bg-gray-900 bg-opacity-80 p-10 rounded-lg shadow-3xl">
+          <h1 className="text-4xl font-bold mb-6 text-white">
+            Welcome to Meet2Talk
+          </h1>
+          <button
+            onClick={toggleForm}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-3xl transition-transform transform hover:scale-105"
+          >
+            Start To Talk
+          </button>
+        </div>
+      )}
+      {/* Popup Form */}
+      {showForm && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center ${
+            isAnimatingOut ? "animate-slide-down" : "animate-slide-up"
+          }`}
         >
-          {isSidebarOpen ? <ChevronLeftIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
-        </button>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex flex-grow items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded shadow-lg w-96">
-          <h1 className="flex text-4xl font-bold mb-6 justify-center text-center">Welcome to Meet2Talk</h1>
-          <h1 className="text-3xl font-bold mb-6 text-center">Join a Random Room</h1>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              type="text"
-              placeholder="Enter your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {error && <p className="text-red-500 text-sm">{error}</p>} {/* Message d'erreur si le pseudo est vide */}
-
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
-              className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="fr">Français</option>
-              <option value="en">English</option>
-              <option value="zh">中文</option>
-              <option value="es">Español</option>
-              <option value="de">Deutsch</option>
-            </select>
-
-            {/* Input pour ajouter des tags */}
-            <div className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center">
+          <div className="bg-gray-900 bg-opacity-80 p-8 rounded-lg shadow-3xl w-100">
+            <h2 className="text-2xl font-bold mb-6 text-center text-gray-200">
+              Join a Room
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <input
                 type="text"
-                placeholder="Add a tag"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                className="focus:outline-none focus:ring-2 focus:ring-blue-500 flex-grow"
+                placeholder="Enter your username"
+                value={username}
+                maxLength={15}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
               />
-              <button
-                onClick={addTag}
-                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 focus:outline-none ml-2"
-              >
-                Add Tag
-              </button>
-            </div>
 
-            {/* Afficher la liste des tags */}
-            <div className="flex flex-wrap space-x-2 mt-4">
-              {tags.map((tag, index) => (
-                <span key={index} className="bg-gray-200 text-gray-700 px-4 py-2 rounded-full flex items-center">
-                  {tag}
-                  <button
-                    onClick={(e) => removeTag(e, tag)}
-                    className="ml-2 text-red-500 hover:text-red-700 focus:outline-none"
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
+              >
+                <option value="">Choose your language</option>
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+                <option value="zh">中文</option>
+                <option value="es">Español</option>
+                <option value="de">Deutsch</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
+              </select>
+              <div className="w-full flex items-center">
+                <input
+                  type="text"
+                  placeholder="Add a tag"
+                  value={tagInput}
+                  maxLength={15}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  className="flex-grow focus:outline-none px-4 py-2 focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg rounded-l"
+                />
+                <button
+                  onClick={addTag}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-r ml-2 hover:bg-blue-700 focus:outline-none shadow-3xl"
+                >
+                  Add Tag
+                </button>
+              </div>
+              <div className="flex flex-wrap space-x-2 mt-4">
+                {tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="bg-gray-700 text-gray-200 px-4 py-2 rounded-full flex items-center"
                   >
-                    &times;
-                  </button>
-                </span>
-              ))}
-            </div>
-            <button
-              type="submit"
-              disabled={username.trim() === ""} // Désactive le bouton si le pseudo est vide
-              className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${username.trim() === "" ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500 text-white hover:bg-blue-600"
+                    {tag}
+                    <button
+                      onClick={(e) => removeTag(e, tag)}
+                      className="ml-2 text-red-500 hover:text-red-700 focus:outline-none"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <button
+                type="submit"
+                disabled={username.trim() === "" || selectedLanguage === ""}
+                className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${
+                  username.trim() === "" || selectedLanguage === ""
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700 shadow-3xl"
                 }`}
-            >
-              Join Room
-            </button>
-          </form>
+              >
+                Join Room
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

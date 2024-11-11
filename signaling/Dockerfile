@@ -4,14 +4,17 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY prisma ./prisma
 
-RUN npm install
+ENV DATABASE_URL=file:./dev.db
+ENV CORS_ORIGIN=pli.ketsuna.com
+
+RUN npm install && npx prisma db push
 
 COPY . .
 
 RUN npx tsc
 
 EXPOSE 8000
-EXPOSE 2000-2020/udp
 
 CMD ["node", "dist/app.js"]
