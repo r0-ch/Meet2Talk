@@ -39,7 +39,7 @@ const remoteParticipants = new Map<string, RemoteParticipant>();
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
-    const { username = 'Guest' } = useLocation().state as { username: string } || {};
+    const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
 
 
     const socketRef = useRef<Socket | null>(null);
