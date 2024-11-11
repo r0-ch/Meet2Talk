@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front
+spec:
+  selector:
+    matchLabels:
+      app: front
+  template:
+    metadata:
+      labels:
+        app: front
+    spec:
+      volumes:
+      - name: cert
+        secret:
+          secretName: mysecret
+      - name: conf
+        configMap:
+          name: conf-nginx
+      containers:
+      - name: front
+        image: ghcr.io/exatombe/pli-front:latest
+        resources:
+          limits:
+            memory: "250Mi"
+            cpu: "250m"
+        ports:
+        - containerPort: 80
+        - containerPort: 443
+        volumeMounts:
+        - name: cert
+          mountPath: "/etc/nginx/certs/"
+        - name: conf
+          mountPath: "/etc/nginx/conf.d/"
+        env:
+        - name: "REACT_APP_BACKEND"
+          value: "https://pli.ketsuna.com"

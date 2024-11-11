@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: libretranslate
+spec:
+  selector:
+    matchLabels:
+      app: libretranslate
+  template:
+    metadata:
+      labels:
+        app: libretranslate
+    spec:
+      containers:
+      - name: libretranslate
+        image: libretranslate/libretranslate:latest
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+
+        volumeMounts:
+        - mountPath: /home/libretranslate/.local/share/argos-translate/packages
+          name: language-vol
+        ports:
+        - containerPort: 5000
+      volumes:
+      - name: language-vol
+        persistentVolumeClaim:
+          claimName: pvc-libretranslate

@@ -39,7 +39,9 @@ const remoteParticipants = new Map<string, RemoteParticipant>();
 
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
-    const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
+    const { username = 'Guest' } = useLocation().state as { username: string } || {};
+
+
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const [messages, setMessages] = useState<{ socketId: string, username: string, message: string, translated: string | null }[]>([]);
@@ -72,6 +74,7 @@ const ChatRoom = () => {
     useEffect(() => {
         const socket = io(`${new URL(process.env.REACT_APP_BACKEND as string).origin}`, {
             withCredentials: true,
+            // tryAllTransports: true,
         });
         console.log(`api: ${process.env.REACT_APP_BACKEND}`);
         socketRef.current = socket;

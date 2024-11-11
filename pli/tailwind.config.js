@@ -1,4 +1,4 @@
-const colors = require('tailwindcss/colors');
+const colors = require('tailwindcss/colors')
 const textShadow = require('tailwindcss-textshadow');
 
 /** @type {import('tailwindcss').Config} */

@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      volumes:
+      - name: cert
+        secret:
+          secretName: mysecret
+      containers:
+      - name: backend
+        image: ghcr.io/exatombe/pli-back:latest
+        resources:
+          limits:
+            memory: "500Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 8000
+        env:
+        - name: CORS_ORIGIN
+          value: https://pli.ketsuna.com
+        - name: DATABASE_URL
+          value: "file:./dev.db"
+        volumeMounts:
+        - name: cert
+          mountPath: "/app/certs"
