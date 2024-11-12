@@ -4,7 +4,7 @@ stages:
 
 build_job:
   stage: build
-  image: gcr.io/kaniko-project/executor:v1.23.2
+  image: gcr.io/kaniko-project/executor:v1.19.1
   variables:
     FF_USE_ADVANCED_POD_SPEC_CONFIGURATION: 1
   script:
