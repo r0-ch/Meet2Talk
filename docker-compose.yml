@@ -25,6 +25,7 @@ services:
       - "8000:8000"
     environment:
       - CORS_ORIGIN=https://localhost:3000
+      - DATABASE_URL=file:./dev.db
     restart: always
     networks:
       - main
