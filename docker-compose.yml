@@ -20,7 +20,6 @@ services:
       context: ./signaling
       dockerfile: Dockerfile
     ports:
-    # server ports 8000 and 2000-2020 for webRTC
       - "8000:8000"
     environment:
       - CORS_ORIGIN=https://localhost:3000
