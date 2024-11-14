@@ -6,7 +6,7 @@ FROM base as deps
 ENV DATABASE_URL=file:./dev.db
 # Install only production dependencies
 COPY package.json package-lock.json prisma/schema.prisma ./
-RUN npm ci --omit=dev && prisma db push
+RUN npm ci --omit=dev && npx prisma db push
 
 # Stage for development dependencies (optional)
 FROM deps as build
