@@ -13,7 +13,6 @@ RUN npm ci
 
 COPY . .
 ARG VITE_REACT_APP_BACKEND=https://pli.ketsuna.com/api
-ENV VITE_REACT_APP_BACKEND=${VITE_REACT_APP_BACKEND}
 
 RUN npm run build
 

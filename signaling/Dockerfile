@@ -13,7 +13,6 @@ FROM deps as build
 
 COPY tsconfig.json ./
 ARG CORS_ORIGIN=pli.ketsuna.com
-ENV CORS_ORIGIN=${CORS_ORIGIN}
 # Install all dependencies (both production and dev)
 COPY package.json package-lock.json ./
 RUN npm ci
