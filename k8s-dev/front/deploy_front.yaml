@@ -20,7 +20,7 @@ spec:
           name: conf-nginx-dev
       containers:
       - name: front-dev
-        image: crissime/pli-front::latest
+        image: crissime/pli-front:latest
         resources:
           limits:
             memory: "250Mi"
@@ -34,5 +34,5 @@ spec:
         - name: conf
           mountPath: "/etc/nginx/conf.d/"
         env:
-        - name: "REACT_APP_BACKEND"
-          value: "https://pli.ketsuna.com"
+        - name: "VITE_REACT_APP_BACKEND"
+          value: "https://pli-dev.ketsuna.com"
