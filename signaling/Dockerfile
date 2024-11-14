@@ -5,11 +5,8 @@ WORKDIR /app
 FROM base as deps
 ENV DATABASE_URL=file:./dev.db
 # Install only production dependencies
-RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=package-lock.json,target=package-lock.json \
-    --mount=type=bind,source=prisma/schema.prisma,target=prisma/schema.prisma \
-    npm ci --omit=dev \
-    npx prisma db push
+COPY package.json package-lock.json prisma/schema.prisma ./
+RUN npm ci --omit=dev && prisma db push
 
 # Stage for development dependencies (optional)
 FROM deps as build
@@ -18,9 +15,8 @@ COPY tsconfig.json ./
 
 ENV CORS_ORIGIN=pli.ketsuna.com
 # Install all dependencies (both production and dev)
-RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=package-lock.json,target=package-lock.json \
-    npm ci
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 

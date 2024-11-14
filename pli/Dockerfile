@@ -8,9 +8,8 @@ WORKDIR /app
 FROM base as build
 
 # Install only production dependencies
-RUN --mount=type=bind,source=package.json,target=package.json \
-    --mount=type=bind,source=package-lock.json,target=package-lock.json \
-    npm ci
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 
