@@ -16,7 +16,7 @@ build_job:
   - /kaniko/executor --context ./signaling --build-arg CORS_ORIGIN=https://pli-dev.ketsuna.com  --dockerfile Dockerfile --destination crissime/pli-brack:dev-${CI_JOB_ID} --cache=true
   tags:
     - build
-
+ 
 deploy_to_dev:
   stage: deploy
   image: bitnami/kubectl:latest
