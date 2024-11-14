@@ -1,7 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
-import backgroundImage from '../img/worldwide.jpg'; // Chemin vers l'image
 
 interface RemoteParticipant {
     peerConnection: RTCPeerConnection;
@@ -72,11 +71,11 @@ const ChatRoom = () => {
     };
 
     useEffect(() => {
-        const socket = io(`${new URL(process.env.REACT_APP_BACKEND as string).origin}`, {
+        const socket = io(`${new URL(import.meta.env.VITE_REACT_APP_BACKEND as string).origin}`, {
             withCredentials: true,
             // tryAllTransports: true,
         });
-        console.log(`api: ${process.env.REACT_APP_BACKEND}`);
+        console.log(`api: ${import.meta.env.VITE_REACT_APP_BACKEND}`);
         socketRef.current = socket;
         setProfilePictures(getRandomProfiles());
         socket.on("connect_error", (err) => {
@@ -94,7 +93,7 @@ const ChatRoom = () => {
             console.log('socket connected', socket.id);
             const media = await getLocalStream();
             await handleLocalStream(media);
-            const { Sockets } = await fetch(`${process.env.REACT_APP_BACKEND}/get-room/${roomId}`).then((res) => res.json()) as { Sockets: { socketId: string, username: string }[] };
+            const { Sockets } = await fetch(`${import.meta.env.VITE_REACT_APP_BACKEND}/get-room/${roomId}`).then((res) => res.json()) as { Sockets: { socketId: string, username: string }[] };
 
             socket.emit("join-room", {
                 roomId,
@@ -526,7 +525,7 @@ const ChatRoom = () => {
             {/* Image de fond floutée */}
             <div
                 className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${backgroundImage})`, filter: 'blur(3px)' }}
+                style={{ backgroundImage: `url(${('/worldwide.jpg')})`, filter: 'blur(3px)' }}
             />
             <div className="absolute inset-0 bg-black opacity-60" /> {/* Couche sombre */}
 

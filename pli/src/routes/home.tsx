@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import React from "react";
-import backgroundImage from "../img/worldwide.jpg"; // Chemin vers une image neutre
 
 export default function Home() {
   const [username, setUsername] = useState("");
@@ -13,10 +11,6 @@ export default function Home() {
   const [showWelcomeBox, setShowWelcomeBox] = useState(true);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const navigate = useNavigate();
-
-  const generateRoomId = () => {
-    return Math.floor(1000000 + Math.random() * 9000000);
-  };
 
   const addTag = (e: any) => {
     e.preventDefault();
@@ -42,8 +36,7 @@ export default function Home() {
       return;
     }
     setError("");
-
-    const room = await fetch(process.env.REACT_APP_BACKEND + "/get-room").then((res) => res.json());
+    const room = await fetch(import.meta.env.VITE_REACT_APP_BACKEND + "/get-room").then((res) => res.json());
 
     navigate(`/room/${room.id}`, { state: { username, selectedLanguage } });
   };
@@ -67,7 +60,7 @@ export default function Home() {
       <div
         className="absolute inset-0 bg-cover bg-center animate-bg-scroll"
         style={{
-          backgroundImage: `url(${backgroundImage})`,
+          backgroundImage: `url('/worldwide.jpg')`,
           backgroundSize: "200% 200%", // Pour donner un effet de défilement plus dynamique
           filter: "blur(2px)",
         }}
