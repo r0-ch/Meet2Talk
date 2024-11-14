@@ -24,7 +24,7 @@ deploy_to_dev:
   - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
   - echo "mise a jour des images"
   - 'sed -i "s|image: crissime/pli-front:.*|image: crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA}|g" k8s-dev/front/deploy_front.yaml'
-  - 'sed -i "s|image: crissime/pli-back:.*|image: crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA}|g" k8s-dev/backend/deploy_backend.yaml'
+  - 'sed -i "s|image: crissime/pli-back:.*|image: crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA}|g" k8s-dev/backend/deploy_back.yaml'
   - echo "Déploiement sur l'environnement de développement..."
   - kubectl apply -f k8s-dev/front --namespace=dev
   - kubectl apply -f k8s-dev/backend --namespace=dev
