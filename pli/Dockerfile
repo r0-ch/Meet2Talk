@@ -20,7 +20,6 @@ RUN --mount=type=bind,source=package.json,target=/app/package.json \
     --mount=type=bind,source=package-lock.json,target=/app/package-lock.json \
     npm ci
 
-
 COPY . .
 
 ENV VITE_REACT_APP_BACKEND=https://pli.ketsuna.com/api

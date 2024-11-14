@@ -19,13 +19,10 @@ services:
   backend:
     build:
       context: ./signaling
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     ports:
     # server ports 8000 and 2000-2020 for webRTC
       - "8000:8000"
-      - "2000-2020:2000-2020/udp"
-    volumes:
-      - ./signaling/src/app.ts:/app/src/app.ts
     environment:
       - CORS_ORIGIN=https://localhost:3000
     restart: always
