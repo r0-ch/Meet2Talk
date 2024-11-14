@@ -5,17 +5,9 @@ FROM node:${NODE_VERSION}-alpine as base
 WORKDIR /app
 
 # Base stage for dependencies
-FROM base as deps
+FROM base as build
 
 # Install only production dependencies
-RUN --mount=type=bind,source=package.json,target=/app/package.json \
-    --mount=type=bind,source=package-lock.json,target=/app/package-lock.json \
-    npm ci --omit=dev
-
-# Stage for development dependencies (optional)
-FROM deps as build
-
-# Install all dependencies (both production and dev)
 RUN --mount=type=bind,source=package.json,target=/app/package.json \
     --mount=type=bind,source=package-lock.json,target=/app/package-lock.json \
     npm ci
