@@ -25,7 +25,7 @@ FROM base as production
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./
-COPY --from=deps /app/dev.db ./prisma/dev.db
+COPY --from=deps /app/dev.db ./
 EXPOSE 8000
 
 CMD ["node", "app.js"]
