@@ -17,7 +17,6 @@ workflow:
 #   tags:
 #     - build
 
-
 deploy_to_dev:
   stage: deploy
   image: bitnami/kubectl:latest
