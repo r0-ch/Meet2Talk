@@ -28,6 +28,6 @@ deploy_to_dev:
   - 'sed -i "s|image: crissime/pli-back:.*|image: crissime/pli-back:dev-${CI_PIPELINE_IID}|g" k8s-dev/backend/deploy_back.yaml'
   - echo "Déploiement sur l'environnement de développement..."
   - kubectl apply -f k8s-dev/front --namespace=dev
-  - kubectl apply -f k8s-dev/back --namespace=dev
+  - kubectl apply -f k8s-dev/backend --namespace=dev
   tags:
     - deploy
