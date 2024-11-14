@@ -1,5 +1,4 @@
 services:
-
   nginx:
     build:
       context: ./pli
