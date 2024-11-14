@@ -7,7 +7,7 @@ WORKDIR /app
 # Base stage for dependencies
 FROM base as build
 
-# Install only production dependencies
+# Install only production dependencies (Using copy to cache)
 COPY package.json package-lock.json ./
 RUN npm ci
 
