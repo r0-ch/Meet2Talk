@@ -13,6 +13,7 @@ RUN --mount=type=bind,source=package.json,target=package.json \
 # Stage for development dependencies (optional)
 FROM deps as build
 
+
 # Install all dependencies (both production and dev)
 RUN --mount=type=bind,source=package.json,target=package.json \
     --mount=type=bind,source=package-lock.json,target=package-lock.json \
