@@ -1,22 +1,107 @@
 stages:
-  - build
-  - deploy
+- calculate_tag
+- build_dev
+- build_prod
+- deploy_dev
+- deploy_prod
 
-# Job pour construire l'application (front et/ou back)
-build_job:
-  stage: build
+workflow:
+  rules:
+  - if: $CI_COMMIT_MESSAGE =~ /\s*-k8s\s*$/
+
+calculate_tag:
+  stage: calculate_tag
   script:
-    - echo "Construction de l'application..."
-    - docker build --build-arg EACT_APP_BACKEND=https://pli-dev.ketsuna.com -t crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA} ./pli
-    - docker build --build-arg CORS_ORIGIN=https://pli-dev.ketsuna.com  -t crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA} ./signaling
-    - docker push crissime/pli-front:dev-${CI_COMMIT_SHORT_SHA}
-    - docker push crissime/pli-back:dev-${CI_COMMIT_SHORT_SHA}
+  - apk add --no-cache jq bash curl
+  - chmod +x increment_version.sh
+  - |
+    if [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
+      ./increment_version.sh major
+    elif [[ "$CI_COMMIT_BRANCH" == "dev" ]]; then
+      ./increment_version.sh minor
+    else
+      ./increment_version.sh patch
+    fi
+  artifacts:
+    paths:
+    - NEW_TAG
+    expire_in: 1 hour
+
+build_dev:
+  stage: build_dev
+  image: gcr.io/kaniko-project/executor:v1.11.0-debug
+  script:
+  - TAG=$(cat NEW_TAG)
+  - echo "Construction de l'application pour l'environnement de développement..."
+  - 'echo
+    "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"
+    > /kaniko/.docker/config.json'
+  - /kaniko/executor --context ./pli --build-arg
+    VITE_REACT_APP_BACKEND=https://pli-dev.ketsuna.com --dockerfile Dockerfile
+    --destination crissime/pli-front:dev-${TAG} --cache=true
+  - /kaniko/executor --context ./signaling --build-arg
+    CORS_ORIGIN=https://pli-dev.ketsuna.com --dockerfile Dockerfile
+    --destination crissime/pli-back:dev-${TAG} --cache=true
+  tags:
+  - build
+  rules:
+  - if: $CI_COMMIT_BRANCH != "main"
+
+build_prod:
+  stage: build_prod
+  image: gcr.io/kaniko-project/executor:v1.11.0-debug
+  script:
+  - TAG=$(cat NEW_TAG)
+  - echo "Construction de l'application pour l'environnement de production..."
+  - 'echo
+    "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"
+    > /kaniko/.docker/config.json'
+  - /kaniko/executor --context ./pli --build-arg
+    VITE_REACT_APP_BACKEND=https://pli-prod.ketsuna.com --dockerfile Dockerfile
+    --destination crissime/pli-front:prod-${TAG} --cache=true
+  - /kaniko/executor --context ./signaling --build-arg
+    CORS_ORIGIN=https://pli-prod.ketsuna.com --dockerfile Dockerfile
+    --destination crissime/pli-back:prod-${TAG} --cache=true
+  tags:
+  - build
+  rules:
+  - if: $CI_COMMIT_BRANCH == "main"
 
 
 deploy_to_dev:
-  stage: deploy
+  stage: deploy_dev
+  image: bitnami/kubectl:latest
   script:
-    - echo "Déploiement sur l'environnement de développement..."
-    - kubectl apply -f k8s-dev/front --namespace=dev
-    - kubectl apply -f k8s-dev/back --namespace=dev
+  - TAG=$(cat NEW_TAG)
+  - cat $KUBECONFIG_DATA | base64 -d > kubeconfig
+  - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
+  - echo "Mise à jour des images pour l'environnement de développement..."
+  - 'sed -i "s|image: crissime/pli-front:.*|image:
+    crissime/pli-front:dev-${TAG}|g" k8s-dev/front/deploy_front.yaml'
+  - 'sed -i "s|image: crissime/pli-back:.*|image:
+    crissime/pli-back:dev-${TAG}|g" k8s-dev/backend/deploy_back.yaml'
+  - kubectl apply -f k8s-dev/front --namespace=dev
+  - kubectl apply -f k8s-dev/backend --namespace=dev
+  tags:
+  - deploy
+  rules:
+  - if: $CI_COMMIT_BRANCH != "main"
 
+deploy_to_prod:
+  stage: deploy_prod
+  image: bitnami/kubectl:latest
+  script:
+  - TAG=$(cat NEW_TAG)
+  - cat $KUBECONFIG_DATA | base64 -d > kubeconfig
+  - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
+  - echo "Mise à jour des images pour l'environnement de production..."
+  - 'sed -i "s|image: crissime/pli-front:.*|image:
+    crissime/pli-front:prod-${TAG}|g" k8s-prod/front/deploy_front.yaml'
+  - 'sed -i "s|image: crissime/pli-back:.*|image:
+    crissime/pli-back:prod-${TAG}|g" k8s-prod/backend/deploy_back.yaml'
+  - kubectl apply -f k8s-prod/front --namespace=prod
+  - kubectl apply -f k8s-prod/backend --namespace=prod
+  tags:
+  - deploy
+  rules:
+  - if: $CI_COMMIT_BRANCH == "main"

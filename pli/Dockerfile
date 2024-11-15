@@ -1,16 +1,23 @@
-FROM node:18 AS build
+ARG NODE_VERSION=20.9.0
+FROM node:${NODE_VERSION}-alpine as base
+
 
 WORKDIR /app
 
-COPY package*.json ./
+# Base stage for dependencies
+FROM base as build
 
-RUN npm install
+# Install only production dependencies (Using copy to cache)
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 
+ENV VITE_REACT_APP_BACKEND=https://pli.ketsuna.com/api
+
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:alpine as production
 
 COPY --from=build /app/build /usr/share/nginx/html
 COPY --from=build /app/nginx.conf /etc/nginx/conf.d/default.conf

@@ -1,17 +1,32 @@
-FROM node:18
+FROM node:20.9.0-alpine as base
 
 WORKDIR /app
 
-COPY package*.json ./
+FROM base as deps
+ENV DATABASE_URL=file:./dev.db
+# Install only production dependencies
+COPY package.json package-lock.json prisma/schema.prisma ./
+RUN npm ci --omit=dev && npx prisma db push
+
+# Stage for development dependencies (optional)
+FROM deps as build
+
 COPY tsconfig.json ./
 
-RUN npm install
+ENV CORS_ORIGIN=pli.ketsuna.com
+# Install all dependencies (both production and dev)
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 
 RUN npx tsc
 
-EXPOSE 8000
-EXPOSE 2000-2020/udp
+FROM base as production
 
-CMD ["node", "dist/app.js"]
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./
+COPY --from=build /app/prisma ./prisma
+EXPOSE 8000
+
+CMD ["node", "app.js"]
