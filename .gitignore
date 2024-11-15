@@ -3,3 +3,4 @@ pli/.env
 signaling/dist
 pli/build
 pli/src/style.css
+.vscode
