@@ -26,12 +26,12 @@
     "maxUsers": "number",
     "private": "boolean",
     "password": "string | null",
-    "Sockets": {
+    "Sockets": [{
         "roomId": "string",
         "username": "string",
         "socketId": "string",
         "createdAt": "Date",
         "updatedAt": "Date",
-    }[]
+    }]
 }
 ```
