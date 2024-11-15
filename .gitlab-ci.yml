@@ -13,14 +13,14 @@ calculate_tag:
   stage: calculate_tag
   script:
   - apk add --no-cache jq bash curl
-  - chmod +x ./group-1038037/increment_version.sh
+  - chmod +x increment_version.sh
   - |
     if [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
-      ./group-1038037/increment_version.sh major
+      increment_version.sh major
     elif [[ "$CI_COMMIT_BRANCH" == "dev" ]]; then
-      ./group-1038037/increment_version.sh minor
+      increment_version.sh minor
     else
-      ./group-1038037/increment_version.sh patch
+      increment_version.sh patch
     fi
   artifacts:
     paths:
