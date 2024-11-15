@@ -11,9 +11,8 @@ workflow:
 
 calculate_tag:
   stage: calculate_tag
-  image: curlimages/curl:latest
   script:
-  - apk add --no-cache jq bash
+  - apk add --no-cache jq bash curl
   - chmod +x ./scripts/increment_version.sh
   - |
     if [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
