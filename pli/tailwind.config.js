@@ -17,6 +17,7 @@ module.exports = {
         blue: colors.blue,
         indigo: colors.indigo,
         white: colors.white,
+        black: colors.black
       },
       width: {
         '112': '28rem',

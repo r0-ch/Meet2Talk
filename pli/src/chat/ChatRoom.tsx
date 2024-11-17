@@ -1,13 +1,15 @@
 import { io, Socket } from "socket.io-client";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
+import Peer from "simple-peer";
+import { ToastContainer, toast, Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-interface RemoteParticipant {
-    peerConnection: RTCPeerConnection;
+interface RemotePeer {
     socketId: string;
     username: string;
-    dataChannel?: RTCDataChannel;
-    tracks?: MediaStreamTrack[];
+    peer: Peer.Instance;
+    stream?: MediaStream | null;
     profilePicture: string;
 }
 
@@ -34,24 +36,25 @@ async function loadIceServers() {
     }]
 }
 
-const remoteParticipants = new Map<string, RemoteParticipant>();
-
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
 
-
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
-    const [messages, setMessages] = useState<{ socketId: string, username: string, message: string, translated: string | null }[]>([]);
-    const [currentMessage, setCurrentMessage] = useState('');
-    const [profilePictures, setProfilePictures] = useState<string[]>([]);
-    const [remotes, setRemotes] = useState<RemoteParticipant[]>([]);
-    const [translationEnabled, setTranslationEnabled] = useState(false);
-    const [isChatExpanded, setIsChatExpanded] = useState(false);
-    const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
+    const localMediaStreamRef = useRef<MediaStream | null>(null);
+    const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null);
+    // const localVideoElement = useRef<HTMLVideoElement | null>(null);
+
+    const peersRef = useRef<any[]>([]);
+    const [peers, setPeers] = useState<any[]>([]);
+
+    const [messages, setMessages] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
+    // const currentMessageRef = useRef<string | null>('');
+    const currentMessageRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
-    const localVideoElement = useRef<HTMLVideoElement | null>(null);
+
+    const [profilePictures, setProfilePictures] = useState<string[]>([]);
     const allProfilePictures = [
         "https://picsum.photos/id/77/367/267",
         "https://picsum.photos/id/40/367/267",
@@ -65,72 +68,73 @@ const ChatRoom = () => {
         "https://picsum.photos/id/306/367/267",
     ];
 
+    const [translationEnabled, setTranslationEnabled] = useState(false);
+    const [isChatExpanded, setIsChatExpanded] = useState(false);
+    const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
+    const [isLoading, setIsLoading] = useState(true);
+
     const getRandomProfiles = () => {
         const shuffled = [...allProfilePictures].sort(() => 0.5 - Math.random());
         return shuffled.slice(0, 2);
     };
 
     useEffect(() => {
+        console.log(`api: ${import.meta.env.VITE_REACT_APP_BACKEND}`);
+
         const socket = io(`${new URL(import.meta.env.VITE_REACT_APP_BACKEND as string).origin}`, {
             withCredentials: true,
-            // tryAllTransports: true,
         });
-        console.log(`api: ${import.meta.env.VITE_REACT_APP_BACKEND}`);
         socketRef.current = socket;
+        localSocketIdRef.current = socket.id;
+
         setProfilePictures(getRandomProfiles());
+
         socket.on("connect_error", (err) => {
             console.log('connect_error', err);
             socket.io.opts.transports = ["polling", "websocket"];
         });
-        // socket.on("connect_error", () => {
-        //     // revert to classic upgrade
-        //     socket.io.opts.transports = ["polling", "websocket"];
-        // });
 
-        socket.on("connect", async () => {
-            await loadIceServers();
-            localSocketIdRef.current = socket.id!;
-            console.log('socket connected', socket.id);
+        socket.emit("join-room", { roomId, username }, async (otherUsers: any) => {
+            console.log('room joined: other users: ', otherUsers);
+
+            openToast('You joind the room!', 'success');
+
+            setIsLoading(true);
+
+            // console.log("Loading ICE servers...");
+            // await loadIceServers();
+            // console.log("ICE servers loaded.");
+
+            console.log("Getting local stream...");
             const media = await getLocalStream();
-            await handleLocalStream(media);
-            const { Sockets } = await fetch(`${import.meta.env.VITE_REACT_APP_BACKEND}/get-room/${roomId}`).then((res) => res.json()) as { Sockets: { socketId: string, username: string }[] };
+            localMediaStreamRef.current = media;
+            setLocalMediaStream(media);
+            console.log("Local stream acquired.");
 
-            socket.emit("join-room", {
-                roomId,
-                username,
+            setIsLoading(false);
+
+            otherUsers.forEach((remoteUser: any) => {
+                handlePeer(remoteUser, true);
             });
+        });
 
-            socket.on("offer", async ({ by, offer, username }) => {
-                handleOffer(offer, by, username);
-            });
+        socket.on("user-joined", async (user: any) => {
+            console.log('user-joined', user);
 
-            socket.on("answer", (data) => {
-                handleAnswer(data.answer, data.by);
-            });
+            await handlePeer(user, false);
+        });
 
-            socket.on("ice-candidate", (data) => {
-                handleIceCandidate(data.candidate, data.by);
-            });
-
-            socket.on("user-disconnected", (socketId: string) => {
-                console.log('user disconnected', socketId);
-                const peerToDisconnect = remoteParticipants.get(socketId);
-                if (peerToDisconnect) {
-                    peerToDisconnect.peerConnection.close();
-                }
-
-                remoteParticipants.delete(socketId);
-                setRemotes((prev) => prev.filter((remote) => remote.socketId !== socketId));
-            });
-
-            if (Sockets.length === 0) {
-                console.log("You'r the Host of this room !");
-            } else {
-                console.log("You'r not the Host of this room !");
+        socket.on("receive-signal", ({ signal, from }) => {
+            const peer = peersRef.current.find((p: any) => p.socketId === from);
+            if (peer) {
+                peer.peer.signal(signal);
             }
-            Sockets.forEach(async ({ socketId, username }) => {
-                connectToSocket(socketId, username, media);
-            });
+        });
+
+        socket.on("user-disconnected", (socketId) => {
+            console.log('user-disconnected', socketId);
+
+            handlePeerLeft(socketId);
         });
 
         window.addEventListener('beforeunload', () => {
@@ -143,125 +147,90 @@ const ChatRoom = () => {
     }, []);
 
 
-    async function connectToSocket(socketId: string, name: string, stream: MediaStream) {
-        if (iceServers.length === 0) {
-            await loadIceServers();
-        }
+    async function handlePeer(user: any, initiator: boolean) {
+        if (!initiator) openToast(`${user.username} is joining...`, 'info');
 
-        const peerConnection = await createPeerConnection();
+        const remotePeer = new Peer({
+            initiator: initiator,
+            trickle: false,
+            stream: localMediaStreamRef.current,
+            // config: {
+            //     iceServers: iceServers
+            // }
+        });
 
-        const dataChannel = peerConnection.createDataChannel("chat");
-
-
-        dataChannel.onopen = () => {
-            console.log("Data channel is open with", socketId);
+        const peer = {
+            peer: remotePeer,
+            socketId: user.socketId,
+            username: user.username,
+            isConnected: false
         };
 
-        dataChannel.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (message.socketId === localSocketIdRef.current) return;
+        peersRef.current.push(peer);
+        setPeers((prevPeers) => [...prevPeers, peer]);
+
+        remotePeer.on("connect", () => {
+            console.log('peer', peer.socketId, 'connected')
+
+            if (!initiator) openToast(`${user.username} is connected!`, 'success');
+
+            const updatedPeers = peersRef.current.map((p: any) => {
+                if (p.socketId === user.socketId) {
+                    return { ...p, isConnected: true };
+                }
+                return p;
+            });
+
+            peersRef.current = updatedPeers;
+
+            setPeers(updatedPeers);
+        })
+
+        remotePeer.on("signal", (data) => {
+            socketRef.current?.emit("send-signal", {
+                to: user.socketId,
+                signal: data,
+                from: socketRef.current?.id,
+            });
+        });
+
+        remotePeer.on("stream", (stream) => {
+            console.log('stream', stream);
+
+            if (!initiator) openToast(`${user.username} is streaming!`, 'info');
+
+            const updatedPeers = peersRef.current.map((p: any) => {
+                if (p.socketId === user.socketId) {
+                    return { ...p, stream };
+                }
+                return p;
+            });
+
+            peersRef.current = updatedPeers;
+
+            setPeers(updatedPeers);
+        });
+
+        remotePeer.on("data", (data) => {
+            const message = JSON.parse(data.toString());
+            console.log('message', message);
             setMessages((prevMessages) => [...prevMessages, message]);
-        }
-
-        dataChannel.onclose = () => {
-            console.log("Data channel closed with", socketId);
-        };
-
-
-        for (const track of stream.getTracks()) {
-            peerConnection.addTrack(track, stream);
-        }
-
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socketRef.current?.emit("ice-candidate", {
-                    candidate: event.candidate,
-                    socketId,
-                });
-            }
-        }
-
-        peerConnection.ontrack = (event) => {
-            const remoteParticipant = remoteParticipants.get(socketId);
-            if (remoteParticipant) {
-                remoteParticipant.tracks = event.streams[0].getTracks();
-                remoteParticipants.set(socketId, remoteParticipant);
-                setRemotes((prev) => [...prev, remoteParticipant]);
-            }
-        }
-
-        remoteParticipants.set(socketId, {
-            peerConnection,
-            socketId,
-            profilePicture: getRandomProfiles()[0],
-            username: name,
-            dataChannel,
-        });
-        setRemotes((prev) => [...prev, {
-            peerConnection,
-            socketId,
-            username: name,
-            dataChannel,
-            profilePicture: getRandomProfiles()[0],
-        }]);
-
-        peerConnection.addEventListener("iceconnectionstatechange", async (event) => {
-            if (peerConnection.iceConnectionState === "disconnected") {
-                /* possibly reconfigure the connection in some way here */
-                /* then request ICE restart */
-                peerConnection.restartIce();
-            } else if (peerConnection.iceConnectionState === "closed") {
-                console.log("ICE CONNECTION CLOSED", socketId);
-                const remoteParticipant = remoteParticipants.get(socketId);
-                if (remoteParticipant) {
-                    remoteParticipant.peerConnection.close();
-                    remoteParticipants.delete(socketId);
-                    setRemotes((prev) => prev.filter((remote) => remote.socketId !== socketId));
-                }
-            }
         });
 
-        peerConnection.onnegotiationneeded = async () => {
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
-            console.log("OFFER SENT BECAUSE OF NEGOTIATION NEEDED", socketId);
-            socketRef.current?.emit("offer", {
-                socketId,
-                offer,
-                username,
-            });
+        return;
+    }
+
+    async function handlePeerLeft(socketId: string) {
+        const peer = peersRef.current.find((p: any) => p.socketId === socketId);
+        if (peer) {
+            peer.peer.destroy();
+            peersRef.current = peersRef.current.filter((p: any) => p.socketId !== socketId);
+            setPeers((prevPeers) => prevPeers.filter((p: any) => p.socketId !== socketId));
         }
 
-
+        return;
     }
 
-    async function handleOffer(offer: RTCSessionDescriptionInit, socketId: string, username: string) {
-        console.log("OFFER RECEIVED", socketId);
-        const peerConnection = await getOrCreatePeerConnection(socketId, username);
-
-        peerConnection
-            .setRemoteDescription(offer)
-            .then(() =>
-                getLocalStream()
-            ).then((media) => {
-                for (const track of media.getTracks()) {
-                    peerConnection.addTrack(track, media);
-                }
-                return peerConnection.createAnswer();
-            }).then((answer) => {
-                return peerConnection.setLocalDescription(answer);
-            }).then(() => {
-                socketRef.current?.emit("answer", {
-                    socketId,
-                    answer: peerConnection.localDescription,
-                });
-                console.log("ANSWER SENT", socketId);
-            });
-
-    }
-
-
-    // Leave the room
 
     // Get and return the local stream
     const getLocalStream = async () => {
@@ -285,130 +254,6 @@ const ChatRoom = () => {
             return new MediaStream(); // Retourne un flux vide
         }
     };
-
-    // Handle the local stream and set it to the local video element
-    const handleLocalStream = (localStream: MediaStream) => {
-        return new Promise<void>((resolve) => {
-            if (localVideoElement.current) {
-                if (localStream.getVideoTracks().length > 0) {
-                    // Si une vidéo est disponible, on l’affiche
-                    localVideoElement.current.srcObject = localStream;
-                } else {
-                    // Sinon, on masque le conteneur
-                    localVideoElement.current.style.display = "none";
-                    resolve();
-                }
-
-                localVideoElement.current.onloadedmetadata = () => {
-                    resolve();
-                };
-            }
-        });
-    };
-
-
-    function handleAnswer(answer: RTCSessionDescriptionInit, socketId: string) {
-        const peerConnection = remoteParticipants.get(socketId)?.peerConnection;
-        if (peerConnection) {
-            peerConnection.setRemoteDescription(answer);
-        }
-    }
-
-    async function getOrCreatePeerConnection(socketId: string, name: string) {
-        const peer = remoteParticipants.get(socketId);
-        if (peer) {
-            return peer.peerConnection;
-        }
-        if (iceServers.length === 0) {
-            await loadIceServers();
-        }
-        const peerConnection = await createPeerConnection();
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socketRef.current?.emit("ice-candidate", {
-                    candidate: event.candidate,
-                    socketId,
-                });
-            }
-        }
-
-        peerConnection.ontrack = (event) => {
-            const remoteParticipant = remoteParticipants.get(socketId);
-            if (remoteParticipant) {
-                remoteParticipant.tracks = event.streams[0].getTracks();
-                remoteParticipants.set(socketId, remoteParticipant);
-                setRemotes((prev) => [...prev, remoteParticipant]);
-            }
-        }
-
-        remoteParticipants.set(socketId, {
-            peerConnection,
-            profilePicture: getRandomProfiles()[0],
-            socketId,
-            username: name,
-            tracks: peerConnection.getReceivers().map((receiver) => receiver.track),
-        });
-
-        setRemotes((prev) => [...prev, {
-            peerConnection,
-            profilePicture: getRandomProfiles()[0],
-            socketId,
-            username: name,
-            tracks: peerConnection.getReceivers().map((receiver) => receiver.track),
-        }]);
-        peerConnection.ondatachannel = (event) => {
-            const dc = event.channel;
-            dc.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                if (message.socketId === localSocketIdRef.current) return;
-                setMessages((prevMessages) => [...prevMessages, message]);
-            }
-
-            dc.onopen = () => {
-                const remoteParticipant = remoteParticipants.get(socketId);
-                if (remoteParticipant) {
-                    remoteParticipant.dataChannel = dc;
-                    remoteParticipants.set(socketId, remoteParticipant);
-                }
-            }
-        }
-
-        peerConnection.addEventListener("iceconnectionstatechange", async (event) => {
-            if (peerConnection.iceConnectionState === "disconnected") {
-                console.log("Reconnecting...");
-                peerConnection.restartIce();
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                console.log("OFFER SENT BECAUSE OF DISCONNECTION", socketId);
-                socketRef.current?.emit("offer", {
-                    socketId,
-                    offer: peerConnection.localDescription,
-                    username,
-                });
-            }
-        });
-
-        return peerConnection;
-    }
-
-    function handleIceCandidate(candidate: RTCIceCandidate, socketId: string) {
-        const peerConnection = remoteParticipants.get(socketId)?.peerConnection;
-        console.log("ICE CANDIDATE FROM REMOTE", socketId, candidate, Array.from(remoteParticipants).map((p) => p[1]));
-        if (peerConnection) {
-            console.log("ICE CANDIDATE RECEIVED", socketId, candidate);
-            peerConnection.addIceCandidate(candidate);
-        }
-    }
-
-    async function createPeerConnection() {
-
-        const peerConnection = new RTCPeerConnection({
-            iceServers: iceServers,
-            iceCandidatePoolSize: 2,
-            iceTransportPolicy: "relay",
-        });
-        return peerConnection;
-    }
 
     async function translate(text: string, target: string = "en") {
         return new Promise<string | null>(async (resolve, reject) => {
@@ -444,7 +289,7 @@ const ChatRoom = () => {
             if (msg.translated || msg.socketId === localSocketIdRef.current) {
                 return msg;
             }
-            const translated = await translate(msg.message, selectedLanguage);
+            const translated = await translate(msg.content, selectedLanguage);
             return { ...msg, translated };
         }));
 
@@ -453,30 +298,45 @@ const ChatRoom = () => {
 
     const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (currentMessage.trim()) {
-            remoteParticipants.forEach((participant) => {
-                if (participant.dataChannel?.readyState === "open") {
-                    participant.dataChannel.send(JSON.stringify({
-                        username,
-                        message: currentMessage,
-                        socketId: localSocketIdRef.current,
-                        translated: null,
-                    }));
+        if (currentMessageRef.current.value.trim()) {
+            const sendData = {
+                type: "message",
+                username,
+                content: currentMessageRef.current.value,
+                socketId: socketRef.current.id,
+                translated: null
+            }
+
+            peersRef.current.forEach((peer) => {
+                console.log(peer)
+                if (peer.isConnected) {
+                    peer.peer.send(JSON.stringify(sendData));
+                } else {
+                    openToast(`Message not sent to ${peer.username}: not connected yet !`, 'warn')
                 }
             });
 
-            setMessages((prevMessages) => [
-                ...prevMessages,
-                {
-                    username,
-                    message: currentMessage,
-                    socketId: localSocketIdRef.current!,
-                    translated: null,
-                },
-            ]);
+            setMessages((prevMessages) => [...prevMessages, sendData]);
+
         }
-        setCurrentMessage('');
+        if (currentMessageRef.current) {
+            currentMessageRef.current.value = "";
+        }
     };
+
+    async function openToast(content: string, type: string) {
+        toast[type](content, {
+            position: "top-right",
+            autoClose: 2000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: false,
+            draggable: true,
+            progress: undefined,
+            theme: "dark",
+            transition: Bounce,
+        })
+    }
 
     // Fonction pour scroller jusqu'au dernier message
     const scrollToBottom = () => {
@@ -490,179 +350,158 @@ const ChatRoom = () => {
         scrollToBottom();
     }, [messages]);
 
-    // return (
-    //     <div>
-    //         <h1>Room: {roomId}</h1>
-    //         <h2>Username: {username}</h2>
-    //         <div id="videos">
-    //             <video id="localVideo" autoPlay controls></video>
-    //             {remoteTrackGroups && remoteTrackGroups.map((trackGroup: any, index: number) => {
-    //                 const mediaStream = new MediaStream();
-    //                 trackGroup.tracks.forEach((track: MediaStreamTrack) => {
-    //                     mediaStream.addTrack(track);
-    //                 });
-
-    //                 return (
-    //                     <video key={index} ref={video => { if (video) { video.srcObject = mediaStream; video.dataset.socketId = trackGroup.socketId; } }} autoPlay controls></video>
-    //                 );
-
-    //             })}
-    //         </div>
-    //         <input type="text" id="message" />
-    //         <button onClick={() => sendMessage((document.getElementById('message') as HTMLInputElement).value)}>Send</button>
-    //         <div>
-    //             {messages && messages.map((message: any, index: number) => {
-    //                 return (
-    //                     <div key={index}>{message.username}: {message.message}</div>
-    //                 );
-    //             })}
-    //         </div>
-    //     </div>
-    // );
-
     return (
-        <div className="relative flex items-center justify-center h-screen bg-gray-900">
-            {/* Image de fond floutée */}
-            <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{ backgroundImage: `url(${('/worldwide.jpg')})`, filter: 'blur(3px)' }}
-            />
-            <div className="absolute inset-0 bg-black opacity-60" /> {/* Couche sombre */}
-
-            <div className="relative z-10 flex w-[95%] h-[95vh] mx-auto p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-3xl overflow-hidden">
-                {/* Sidebar utilisateurs */}
-                <div
-                    className={`flex flex-col h-full bg-gray-700 p-4 rounded-lg shadow-lg transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : 'translate-x-[-2000%]'}`}
-                    style={{ width: isSidebarVisible ? '10%' : '0%' }}
-                >
-                    <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
-                    <ul className="space-y-2">
-                        <li className="text-white">{username}</li>
-                        {remoteParticipants.size > 0 && Array.from(remoteParticipants).map((user, index) => (
-                            <li key={index} className="text-white">{user[1].username}</li>
-                        ))}
-                    </ul>
+        <>
+            <ToastContainer />
+            {isLoading ? (
+                <div className="flex items-center justify-center h-screen bg-gray-900">
+                    <div className="text-white">Loading...</div>
                 </div>
-
-                {/* Contenu principal */}
-                <div className={`flex flex-col ${isSidebarVisible ? 'w-[90%]' : 'w-full'} h-full space-y-4 bg-white-800 bg-opacity-80 overflow-hidden p-2 relative`}>
-                    {/* Bouton pour cacher/montrer la sidebar */}
-                    <div className="absolute top-4 left-4 z-20 flex items-center">
-                        <button
-                            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
-                            className="text-gray-300 bg-blue-500 px-3 py-2 rounded hover:bg-blue-600 transition"
+            ) : (
+                <div className="relative flex items-center justify-center h-screen bg-gray-900">
+                    {/* Image de fond floutée */}
+                    <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${('/worldwide.jpg')})`, filter: 'blur(3px)' }}
+                    />
+                    <div className="absolute inset-0 bg-black opacity-60" /> {/* Couche sombre */}
+    
+                    <div className="relative z-10 flex w-full h-full mx-auto shadow-3xl overflow-hidden">
+                        {/* Sidebar utilisateurs */}
+                        <div
+                            className={`fixed z-30 top-0 left-0 h-full bg-gray-700 p-4 rounded-lg shadow-lg transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}`}
+                            style={{ width: '250px', paddingTop: '5rem' }}
                         >
-                            {/* Icône de flèche */}
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className={`h-6 w-6 transform transition-transform duration-300`} // Ajustement de la flèche
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                {isSidebarVisible ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 9l-5 5 5 5" /> // Flèche vers la gauche
-                                ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 15l5-5-5-5" /> // Flèche vers la droite
-                                )}
-                            </svg>
-                        </button>
-                    </div>
-
-                    {/* Section des Vidéos */}
-                    {!isChatExpanded && (
-                        <div className="flex justify-center space-x-6 w-full p-4 border-gray-500 border-b-2">
-                            <video autoPlay controls ref={localVideoElement} className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
-                            {localVideoElement.current && localVideoElement.current.style.display === "none" && (
-                                <img src={profilePictures[0]} alt="Yourself" className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
-                            )}
-                            {remotes.map((remote, index) => {
-                                const mediaStream = new MediaStream();
-                                remote.tracks?.forEach((track) => {
-                                    mediaStream.addTrack(track);
-                                });
-
-                                if (remote.tracks && remote.tracks.length > 0) {
-                                    return (
-                                        <video className="w-[25%] h-[100%] border border-gray-600 rounded-md"
-                                            key={index} ref={video => {
-                                                if (video) { video.srcObject = mediaStream; video.dataset.socketId = remote.socketId; }
-                                            }} autoPlay controls>
-                                        </video>
-                                    );
-                                } else {
-                                    return (
-                                        <img
-                                            key={index}
-                                            src={remote.profilePicture} alt={remote.username} className="w-[25%] h-[100%] border border-gray-600 rounded-md" />
-                                    )
-                                }
-                            })}
-                        </div>
-                    )}
-
-                    {/* Section chat expand/minimize */}
-                    <div className="w-full flex justify-end mb-2">
-                        <button
-                            onClick={() => setIsChatExpanded(!isChatExpanded)}
-                            className="text-gray-300 hover:text-gray-100"
-                        >
-                            {isChatExpanded ? 'Minimize' : 'Expand'}
-                        </button>
-                    </div>
-
-                    {/* Boîte des Messages */}
-                    <div className={`w-full ${isChatExpanded ? 'h-[95%]' : 'h-[95%]'} p-4 rounded-lg overflow-y-auto relative`}>
-                        {messages.length === 0 ? (
-                            <p className="text-gray-300 text-center">No message</p>
-                        ) : (
-                            messages.map((msg, index) => (
-                                <div
-                                    key={index}
-                                    className={`flex items-center mb-3 ${msg.socketId !== localSocketIdRef.current ? 'justify-start' : 'justify-end'}`}
-                                >
-                                    <div
-                                        className={`p-3 rounded-lg max-w-md break-words ${msg.socketId !== localSocketIdRef.current ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
-                                    >
-                                        <span className="font-semibold block mb-1">{msg.username}:</span>
-                                        <span>{translationEnabled && msg.translated ? msg.translated : msg.message}</span>
+                            <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
+                            <ul className="space-y-2">
+                                <h4 className="text-white">{username}</h4>
+                                {peers.map((peer, index) => (
+                                    <div key={index}>
+                                        <h4 className="text-white">{peer.username}</h4>
                                     </div>
-                                </div>
-                            ))
-                        )}
-                        <div ref={messagesEndRef} /> {/* Référence pour scroll */}
-                    </div>
-
-                    <div className="w-full flex justify-start mb-2 ml-2">
-                        <button
-                            onClick={async () => await enableTranslation()}
-                            className={` ${translationEnabled ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
-                        >
-                            Translate conversation
-                        </button>
-                    </div>
-
-                    {/* Formulaire de Message */}
-                    <form onSubmit={handleSendMessage} className="w-full">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                value={currentMessage}
-                                onChange={(e) => setCurrentMessage(e.target.value)}
-                                className="w-full p-3 rounded-lg bg-gray-700 text-gray-200 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 shadow"
-                                placeholder="Write a message..."
-                            />
+                                ))}
+                            </ul>
+                        </div>
+    
+                        {/* Bouton pour cacher/montrer la sidebar */}
+                        <div className="absolute z-40 top-4 left-4 flex items-center">
                             <button
-                                type="submit"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition"
+                                onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                                className="text-gray-300 bg-blue-500 px-3 py-2 rounded hover:bg-blue-600 transition"
                             >
-                                Send
+                                {/* Icône de flèche */}
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-6 w-6 transform transition-transform duration-300"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    {isSidebarVisible ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 9l-5 5 5 5" />
+                                    ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 15l5-5-5-5" />
+                                    )}
+                                </svg>
                             </button>
                         </div>
-                    </form>
+    
+                        {/* Contenu principal */}
+                        <div className="relative flex flex-col w-full h-full p-4 bg-gray-900 bg-opacity-80 overflow-hidden">
+                            {/* Section des Vidéos */}
+                            <div className={`flex flex-wrap justify-center gap-4 p-4`}>
+                                {/* Vidéo utilisateur local */}
+                                <div className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
+                                    {localMediaStream ? (
+                                        <video
+                                            ref={(video) => video && (video.srcObject = localMediaStream)}
+                                            className="w-full h-full object-cover rounded-lg"
+                                            autoPlay
+                                            muted
+                                        />
+                                    ) : (
+                                        <img
+                                            src={profilePictures[0]}
+                                            alt={username}
+                                            className="w-full h-full object-cover rounded-lg"
+                                        />
+                                    )}
+                                </div>
+    
+                                {/* Vidéos des pairs */}
+                                {peers.map((peer, index) => (
+                                    <div key={index} className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
+                                        {peer.stream ? (
+                                            <video
+                                                ref={video => video && (video.srcObject = peer.stream)}
+                                                className="w-full h-full object-cover rounded-lg"
+                                                autoPlay
+                                            />
+                                        ) : (
+                                            <img
+                                                src={profilePictures[1]}
+                                                alt={peer.username}
+                                                className="w-full h-full object-cover rounded-lg"
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+    
+                            {/* Boîte de messages */}
+                            <div className="w-full h-[50%] p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4">
+                                {messages.length === 0 ? (
+                                    <p className="text-gray-300 text-center">No message</p>
+                                ) : (
+                                    messages.map((msg, index) => (
+                                        <div
+                                            key={index}
+                                            className={`flex items-center mb-3 ${msg.socketId !== socketRef.current.id ? 'justify-start' : 'justify-end'}`}
+                                        >
+                                            <div
+                                                className={`p-3 rounded-lg max-w-md break-words ${msg.socketId !== socketRef.current.id ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
+                                            >
+                                                <span className="font-semibold block mb-1">{msg.username}:</span>
+                                                <span>{translationEnabled && msg.translated ? msg.translated : msg.content}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                                <div ref={messagesEndRef} /> {/* Référence pour le scroll */}
+                            </div>
+    
+                            {/* Bouton pour activer/désactiver la traduction */}
+                            <div className="flex justify-start mb-2">
+                                <button
+                                    onClick={async () => await enableTranslation()}
+                                    className={`${translationEnabled ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
+                                >
+                                    Translate conversation
+                                </button>
+                            </div>
+    
+                            {/* Formulaire de message */}
+                            <form onSubmit={handleSendMessage} className="w-full">
+                                <div className="relative">
+                                    <input
+                                        ref={currentMessageRef}
+                                        type="text"
+                                        className="w-full p-3 rounded-lg bg-gray-700 text-gray-200 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 shadow"
+                                        placeholder="Write a message..."
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition"
+                                    >
+                                        Send
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
+            )}
+        </>
     );
 }
 

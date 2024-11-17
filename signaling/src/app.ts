@@ -87,9 +87,11 @@ app.get('/get-room/:id', async (req, res) => {
 
 
 io.on('connection', (socket) => {
-    socket.on('join-room', async ({ roomId, username }) => {
+
+    socket.on('join-room', async ({ roomId, username }, callback) => {
         console.log('join-room', socket.id, username);
         socket.join(roomId);
+
         await prisma.room.update({
             where: {
                 id: roomId
@@ -106,36 +108,31 @@ io.on('connection', (socket) => {
                 }
             }
         });
-        socket.to(roomId).emit('user-connected', {
-            socketId: socket.id,
-            username: username
+
+        const user = await prisma.socket.findUnique({
+            where: {
+                socketId: socket.id
+            }
         });
+        socket.to(roomId).emit('user-joined', user);
+
+        const otherUsers = await prisma.socket.findMany({
+            where: {
+                roomId: roomId,
+                socketId: {
+                    not: socket.id
+                }
+            }
+        });
+
+        callback(otherUsers);
     });
 
-    socket.on('offer', ({ socketId, offer, username }) => {
-        console.log('offer', username)
-        socket.to(socketId).emit('offer', {
-            by: socket.id,
-            offer: offer,
-            username: username
-        });
+    socket.on('send-signal', async ({ to, signal, from }) => {
+        console.log('send-signal', to, signal, from);
+        socket.to(to).emit('receive-signal', { signal, from });
     });
 
-    socket.on('answer', ({ socketId, answer }) => {
-        console.log('answer', socketId);
-        socket.to(socketId).emit('answer', {
-            by: socket.id,
-            answer: answer
-        });
-    });
-
-    socket.on('ice-candidate', ({ socketId, candidate }) => {
-        console.log('ice-candidate', socketId);
-        socket.to(socketId).emit('ice-candidate', {
-            by: socket.id,
-            candidate: candidate
-        });
-    });
 
     socket.on('disconnect', async () => {
 
