@@ -4,6 +4,7 @@ import { useParams, useLocation } from "react-router-dom";
 import Peer from "simple-peer";
 import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import RecordRTC from "recordrtc";
 
 interface RemotePeer {
     socketId: string;
@@ -42,17 +43,18 @@ const ChatRoom = () => {
 
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
+    const whisperSocketRef = useRef<Socket | null>(null);
     const localMediaStreamRef = useRef<MediaStream | null>(null);
     const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null);
-    // const localVideoElement = useRef<HTMLVideoElement | null>(null);
 
     const peersRef = useRef<any[]>([]);
     const [peers, setPeers] = useState<any[]>([]);
 
     const [messages, setMessages] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
-    // const currentMessageRef = useRef<string | null>('');
     const currentMessageRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
+    const [transcriptions, setTranscriptions] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
+    const [lastTranscriptions, setLastTranscriptions] = useState<{}>({});
 
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
     const allProfilePictures = [
@@ -87,6 +89,9 @@ const ChatRoom = () => {
         socketRef.current = socket;
         localSocketIdRef.current = socket.id;
 
+        const whisperSocket= io(`${new URL(import.meta.env.VITE_REACT_APP_WHISPER as string).origin}/whisper`);
+        whisperSocketRef.current = whisperSocket;
+
         setProfilePictures(getRandomProfiles());
 
         socket.on("connect_error", (err) => {
@@ -111,6 +116,8 @@ const ChatRoom = () => {
             setLocalMediaStream(media);
             console.log("Local stream acquired.");
 
+            handleTranscription(media);
+
             setIsLoading(false);
 
             otherUsers.forEach((remoteUser: any) => {
@@ -130,6 +137,29 @@ const ChatRoom = () => {
                 peer.peer.signal(signal);
             }
         });
+
+
+        socket.on("transcription-requested", ({socketId, enabled}) => {
+
+            const peer = peersRef.current.find((p: any) => p.socketId === socketId);
+            if (peer) {
+                peer.transcriptionRequested = enabled;
+            }
+
+            setPeers((prevPeers) => prevPeers.map((p) => {
+                if (p.socketId === socketId) {
+                    return peer;
+                }
+                return p;
+            }));
+
+            console.log('transcription-requested', socketId, enabled);
+        });
+
+        whisperSocket.on('transcription', async (data) => {
+            console.log('transcription', data);
+            handleSendTranscription(data);
+        })
 
         socket.on("user-disconnected", (socketId) => {
             console.log('user-disconnected', socketId);
@@ -214,7 +244,17 @@ const ChatRoom = () => {
         remotePeer.on("data", (data) => {
             const message = JSON.parse(data.toString());
             console.log('message', message);
-            setMessages((prevMessages) => [...prevMessages, message]);
+
+            if (message.type === "message") {
+                setMessages((prevMessages) => [...prevMessages, message]);
+                
+            } else if (message.type === "transcription") {
+                setTranscriptions((prevTranscriptions) => [...prevTranscriptions, message]);
+                setLastTranscriptions((prevLastTranscriptions) => ({
+                    ...prevLastTranscriptions,
+                    [message.socketId]: message
+                }));
+            }
         });
 
         return;
@@ -226,6 +266,8 @@ const ChatRoom = () => {
             peer.peer.destroy();
             peersRef.current = peersRef.current.filter((p: any) => p.socketId !== socketId);
             setPeers((prevPeers) => prevPeers.filter((p: any) => p.socketId !== socketId));
+
+            openToast(`${peer.username} left the room!`, 'warn');
         }
 
         return;
@@ -237,7 +279,13 @@ const ChatRoom = () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
-                audio: true,
+                audio: {
+                    channelCount: 1,
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                }
+
             });
 
             // Vérification des pistes disponibles
@@ -324,6 +372,86 @@ const ChatRoom = () => {
         }
     };
 
+    async function handleSendTranscription(transcription: any) {
+        peersRef.current.forEach((peer) => {
+            if (peer.transcriptionRequested === true) {
+                peer.peer.send(JSON.stringify({
+                    type: "transcription",
+                    username,
+                    content: transcription.transcription,
+                    socketId: localSocketIdRef.current,
+                    translated: null
+                }));
+                console.log('transcription sent');
+            }
+        });
+    }
+
+    async function toggleTranscribe(peer: any) {
+        let enabled;
+        if (!peer.transcriptionEnabled || peer.transcriptionEnabled === false) {
+            enabled = true;
+        } else {
+            enabled = false;
+        }
+
+        peer.transcriptionEnabled = enabled;
+
+        peersRef.current = peersRef.current.map((p) => {
+            if (p.socketId === peer.socketId) {
+                return peer;
+            }
+            return p;
+        });
+
+        setPeers((prevPeers) => prevPeers.map((p) => {
+            if (p.socketId === peer.socketId) {
+                return peer;
+            }
+            return p;
+        }));
+
+        openToast(`Transcription ${enabled ? 'enabled' : 'disabled'} for ${peer.username}`, 'info');
+
+        socketRef.current?.emit('toggle-transcription', { socketId: peer.socketId, enabled: peer.transcriptionEnabled });
+    }
+
+    let handleDataAvailable = (event: any) => {
+        if (event.size > 0) {
+            blobToBase64(event).then(b64 => {
+                console.log('sending audio...', b64);
+                whisperSocketRef.current?.emit('audio', { audio: b64, language: selectedLanguage });
+            })
+        }
+    };
+
+    function blobToBase64(blob: Blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onload = () => {
+                const result = reader.result as string;
+                const base64String = result.split(',')[1];
+                resolve(base64String);
+            };
+            reader.onerror = (error) => reject(error);
+        });
+    }
+
+    async function handleTranscription(stream: MediaStream) {
+        let recorder = new RecordRTC(stream, {
+            type: 'audio',
+            recorderType: RecordRTC.StereoAudioRecorder,
+            mimeType: 'audio/wav',
+            timeSlice: 4000,
+            desiredSampRate: 16000,
+            numberOfAudioChannels: 1,
+            ondataavailable: handleDataAvailable
+        });
+
+        recorder.startRecording();
+    }
+
     async function openToast(content: string, type: string) {
         toast[type](content, {
             position: "top-right",
@@ -374,10 +502,13 @@ const ChatRoom = () => {
                         >
                             <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
                             <ul className="space-y-2">
-                                <h4 className="text-white">{username}</h4>
+                                <h4 className="text-white text-xl">{username}</h4>
                                 {peers.map((peer, index) => (
                                     <div key={index}>
-                                        <h4 className="text-white">{peer.username}</h4>
+                                        <h4 className="text-white text-xl">{peer.username}</h4>
+                                        <ul>
+                                            <li onClick={() => toggleTranscribe(peer)}>transcribe</li>
+                                        </ul>
                                     </div>
                                 ))}
                             </ul>
@@ -407,7 +538,7 @@ const ChatRoom = () => {
                         </div>
     
                         {/* Contenu principal */}
-                        <div className="relative flex flex-col w-full h-full p-4 bg-gray-900 bg-opacity-80 overflow-hidden">
+                        <div className="relative flex flex-col justify-between w-full h-full p-4 bg-gray-900 bg-opacity-80 overflow-hidden" style={{ justifyContent: 'space-between' }}>
                             {/* Section des Vidéos */}
                             <div className={`flex flex-wrap justify-center gap-4 p-4`}>
                                 {/* Vidéo utilisateur local */}
@@ -417,6 +548,7 @@ const ChatRoom = () => {
                                             ref={(video) => video && (video.srcObject = localMediaStream)}
                                             className="w-full h-full object-cover rounded-lg"
                                             autoPlay
+                                            controls
                                             muted
                                         />
                                     ) : (
@@ -436,6 +568,8 @@ const ChatRoom = () => {
                                                 ref={video => video && (video.srcObject = peer.stream)}
                                                 className="w-full h-full object-cover rounded-lg"
                                                 autoPlay
+                                                controls
+                                                muted
                                             />
                                         ) : (
                                             <img
@@ -444,6 +578,15 @@ const ChatRoom = () => {
                                                 className="w-full h-full object-cover rounded-lg"
                                             />
                                         )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="w-full p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4 text-white">
+                                {Object.entries(lastTranscriptions).map(([key, transcription]) => (
+                                    <div key={key}>
+                                        <h4 className="text-xl">{(transcription as any).username}:</h4>
+                                        <p>{(transcription as any).content}</p>
                                     </div>
                                 ))}
                             </div>
