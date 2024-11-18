@@ -133,6 +133,18 @@ io.on('connection', (socket) => {
         socket.to(to).emit('receive-signal', { signal, from });
     });
 
+    socket.on('toggle-transcription', ({socketId, enabled}) => {
+        console.log('transcription enabled', enabled, 'for', socketId);
+
+        const user = prisma.socket.findUnique({
+            where: {
+                socketId: socketId
+            }
+        });
+
+        socket.to(socketId).emit('transcription-requested', ({ socketId: socket.id, enabled: enabled }));
+    });
+
 
     socket.on('disconnect', async () => {
 
