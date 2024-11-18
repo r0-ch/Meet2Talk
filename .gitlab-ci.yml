@@ -37,7 +37,7 @@ build_dev:
     "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"
     > /kaniko/.docker/config.json'
   - /kaniko/executor --context ./pli --build-arg
-    VITE_REACT_APP_BACKEND=https://pli-dev.ketsuna.com --dockerfile Dockerfile
+    VITE_REACT_APP_BACKEND=https://pli-dev.ketsuna.com VITE_REACT_APP_WHISPER=https://pli-dev.ketsuna.com --dockerfile Dockerfile
     --destination crissime/pli-front:dev-${TAG} --cache=true
   - /kaniko/executor --context ./signaling --build-arg
     CORS_ORIGIN=https://pli-dev.ketsuna.com --dockerfile Dockerfile
@@ -56,10 +56,10 @@ build_prod:
     "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"
     > /kaniko/.docker/config.json'
   - /kaniko/executor --context ./pli --build-arg
-    VITE_REACT_APP_BACKEND=https://pli-prod.ketsuna.com --dockerfile Dockerfile
+    VITE_REACT_APP_BACKEND=https://pli.ketsuna.com  VITE_REACT_APP_WHISPER=https://pli.ketsuna.com  --dockerfile Dockerfile
     --destination crissime/pli-front:prod-${TAG} --cache=true
   - /kaniko/executor --context ./signaling --build-arg
-    CORS_ORIGIN=https://pli-prod.ketsuna.com --dockerfile Dockerfile
+    CORS_ORIGIN=https://pli.ketsuna.com --dockerfile Dockerfile
     --destination crissime/pli-back:prod-${TAG} --cache=true
   
   rules:
