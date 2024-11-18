@@ -42,8 +42,7 @@ build_dev:
   - /kaniko/executor --context ./signaling --build-arg
     CORS_ORIGIN=https://pli-dev.ketsuna.com --dockerfile Dockerfile
     --destination crissime/pli-back:dev-${TAG} --cache=true
-  tags:
-  - build
+  
   rules:
   - if: $CI_COMMIT_BRANCH != "main"
 
@@ -62,8 +61,7 @@ build_prod:
   - /kaniko/executor --context ./signaling --build-arg
     CORS_ORIGIN=https://pli-prod.ketsuna.com --dockerfile Dockerfile
     --destination crissime/pli-back:prod-${TAG} --cache=true
-  tags:
-  - build
+  
   rules:
   - if: $CI_COMMIT_BRANCH == "main"
 
@@ -82,8 +80,6 @@ deploy_to_dev:
     crissime/pli-back:dev-${TAG}|g" k8s-dev/backend/deploy_back.yaml'
   - kubectl apply -f k8s-dev/front --namespace=dev
   - kubectl apply -f k8s-dev/backend --namespace=dev
-  tags:
-  - deploy
   rules:
   - if: $CI_COMMIT_BRANCH != "main"
 
@@ -101,7 +97,5 @@ deploy_to_prod:
     crissime/pli-back:prod-${TAG}|g" k8s-prod/backend/deploy_back.yaml'
   - kubectl apply -f k8s-prod/front --namespace=prod
   - kubectl apply -f k8s-prod/backend --namespace=prod
-  tags:
-  - deploy
   rules:
   - if: $CI_COMMIT_BRANCH == "main"
