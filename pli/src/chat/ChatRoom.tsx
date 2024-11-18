@@ -89,7 +89,9 @@ const ChatRoom = () => {
         socketRef.current = socket;
         localSocketIdRef.current = socket.id;
 
-        const whisperSocket= io(`${new URL(import.meta.env.VITE_REACT_APP_WHISPER as string).origin}/whisper`);
+        const whisperSocket= io(`${new URL(import.meta.env.VITE_REACT_APP_WHISPER as string).origin}`, {
+            path: '/socket.io/whisper',
+        });
         whisperSocketRef.current = whisperSocket;
 
         setProfilePictures(getRandomProfiles());
@@ -569,7 +571,6 @@ const ChatRoom = () => {
                                                 className="w-full h-full object-cover rounded-lg"
                                                 autoPlay
                                                 controls
-                                                muted
                                             />
                                         ) : (
                                             <img
