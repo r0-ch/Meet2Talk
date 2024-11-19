@@ -26,6 +26,8 @@ calculate_tag:
     paths:
     - NEW_TAG
     expire_in: 1 hour
+  tags:
+    - k8s
 
 build_dev:
   stage: build_dev
@@ -40,6 +42,8 @@ build_dev:
     - build
   rules:
   - if: $CI_COMMIT_BRANCH != "main"
+
+
 build_back_dev:
   stage: build_dev
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
@@ -63,9 +67,10 @@ build_prod:
   - /kaniko/executor --context ./pli --build-arg VITE_REACT_APP_BACKEND=https://pli-prod.ketsuna.com --dockerfile Dockerfile --destination crissime/pli-front:${TAG} --cache=true
   - /kaniko/executor --context ./signaling --build-arg CORS_ORIGIN=https://pli-prod.ketsuna.com --dockerfile Dockerfile --destination crissime/pli-back:${TAG} --cache=true
   tags:
-    - none
+    - build
   rules:
   - if: $CI_COMMIT_BRANCH == "main"
+
 
 
 deploy_to_dev:
@@ -80,7 +85,8 @@ deploy_to_dev:
   - 'sed -i "s|image: crissime/pli-back:.*|image: crissime/pli-back:${TAG}|g" k8s-dev/backend/deploy_back.yaml'
   - kubectl apply -f k8s-dev/front --namespace=dev
   - kubectl apply -f k8s-dev/backend --namespace=dev
-
+  tags:
+    - k8s
   rules:
   - if: $CI_COMMIT_BRANCH != "main"
 
@@ -96,6 +102,8 @@ deploy_to_prod:
   - 'sed -i "s|image: crissime/pli-back:.*|image:crissime/pli-back:${TAG}|g" k8s-prod/backend/deploy_back.yaml'
   - kubectl apply -f k8s-prod/front --namespace=prod
   - kubectl apply -f k8s-prod/backend --namespace=prod
+  tags:
+    - k8s
 
   rules:
   - if: $CI_COMMIT_BRANCH == "main"
