@@ -296,12 +296,13 @@ const ChatRoom = () => {
 
             if (!hasVideoTrack || !hasAudioTrack) {
                 console.warn("Aucune piste vidéo ou audio disponible");
+                return null;
             }
 
             return mediaStream;
         } catch (err) {
             console.error("Erreur d'accès aux périphériques:", err);
-            return new MediaStream(); // Retourne un flux vide
+            return null; // Retourne null
         }
     };
 
@@ -421,7 +422,7 @@ const ChatRoom = () => {
     let handleDataAvailable = (event: any) => {
         if (event.size > 0) {
             blobToBase64(event).then(b64 => {
-                console.log('sending audio...', b64);
+                console.log('sending audio to whisper service...');
                 whisperSocketRef.current?.emit('audio', { audio: b64, language: selectedLanguage });
             })
         }
@@ -441,6 +442,10 @@ const ChatRoom = () => {
     }
 
     async function handleTranscription(stream: MediaStream) {
+        if (!stream) {
+            console.error('No stream to transcribe');
+            return;
+        }
         let recorder = new RecordRTC(stream, {
             type: 'audio',
             recorderType: RecordRTC.StereoAudioRecorder,
