@@ -25,7 +25,6 @@ const PeerVideo = ({ peer }) => {
                     className="w-full h-full object-cover rounded-lg"
                     autoPlay
                     controls
-                    muted
                 />
             ) : hasAudio ? (
                 <>
