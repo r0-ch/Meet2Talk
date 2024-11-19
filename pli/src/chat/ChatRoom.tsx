@@ -142,7 +142,7 @@ const ChatRoom = () => {
         });
 
 
-        socket.on("transcription-requested", ({socketId, enabled}) => {
+        socket.on("transcription-requested", ({ socketId, enabled }) => {
 
             const peer = peersRef.current.find((p: any) => p.socketId === socketId);
             if (peer) {
@@ -250,7 +250,7 @@ const ChatRoom = () => {
 
             if (message.type === "message") {
                 setMessages((prevMessages) => [...prevMessages, message]);
-                
+
             } else if (message.type === "transcription") {
                 setTranscriptions((prevTranscriptions) => [...prevTranscriptions, message]);
                 setLastTranscriptions((prevLastTranscriptions) => ({
@@ -280,29 +280,31 @@ const ChatRoom = () => {
     // Get and return the local stream
     const getLocalStream = async () => {
         try {
-            const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
+            const audioStreamPromise = navigator.mediaDevices.getUserMedia({
                 audio: {
                     channelCount: 1,
                     echoCancellation: false,
                     noiseSuppression: false,
                     autoGainControl: false,
                 }
+            }).catch(() => null);
+            const videoStreamPromise = navigator.mediaDevices.getUserMedia({ video: true }).catch(() => null);
 
-            });
+            const [audioStream, videoStream] = await Promise.all([audioStreamPromise, videoStreamPromise]);
 
-            // Vérification des pistes disponibles
-            const hasVideoTrack = mediaStream.getVideoTracks().length > 0;
-            const hasAudioTrack = mediaStream.getAudioTracks().length > 0;
-
-            if (!hasVideoTrack || !hasAudioTrack) {
-                console.warn("Aucune piste vidéo ou audio disponible");
+            if (audioStream && videoStream) {
+                const combinedStream = new MediaStream([
+                    ...audioStream.getAudioTracks(),
+                    ...videoStream.getVideoTracks()
+                ]);
+                return combinedStream;
             }
 
-            return mediaStream;
+            return audioStream || videoStream || null;
+
         } catch (err) {
             console.error("Erreur d'accès aux périphériques:", err);
-            return new MediaStream(); // Retourne un flux vide
+            return null;
         }
     };
 
@@ -422,7 +424,7 @@ const ChatRoom = () => {
     let handleDataAvailable = (event: any) => {
         if (event.size > 0) {
             blobToBase64(event).then(b64 => {
-                console.log('sending audio...', b64);
+                console.log('sending audio to whisper service...');
                 whisperSocketRef.current?.emit('audio', { audio: b64, language: selectedLanguage });
             })
         }
@@ -442,6 +444,10 @@ const ChatRoom = () => {
     }
 
     async function handleTranscription(stream: MediaStream) {
+        if (!stream) {
+            console.error('No stream to transcribe');
+            return;
+        }
         let recorder = new RecordRTC(stream, {
             type: 'audio',
             recorderType: RecordRTC.StereoAudioRecorder,
@@ -496,7 +502,7 @@ const ChatRoom = () => {
                         style={{ backgroundImage: `url(${('/worldwide.jpg')})`, filter: 'blur(3px)' }}
                     />
                     <div className="absolute inset-0 bg-black opacity-60" /> {/* Couche sombre */}
-    
+
                     <div className="relative z-10 flex w-full h-full mx-auto shadow-3xl overflow-hidden">
                         {/* Sidebar utilisateurs */}
                         <div
@@ -516,7 +522,7 @@ const ChatRoom = () => {
                                 ))}
                             </ul>
                         </div>
-    
+
                         {/* Bouton pour cacher/montrer la sidebar */}
                         <div className="absolute z-40 top-4 left-4 flex items-center">
                             <button
@@ -539,7 +545,7 @@ const ChatRoom = () => {
                                 </svg>
                             </button>
                         </div>
-    
+
                         {/* Contenu principal */}
                         <div className="relative flex flex-col justify-between w-full h-full p-4 bg-gray-900 bg-opacity-80 overflow-hidden" style={{ justifyContent: 'space-between' }}>
                             {/* Section des Vidéos */}
@@ -547,13 +553,29 @@ const ChatRoom = () => {
                                 {/* Vidéo utilisateur local */}
                                 <div className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
                                     {localMediaStream ? (
-                                        <video
-                                            ref={(video) => video && (video.srcObject = localMediaStream)}
-                                            className="w-full h-full object-cover rounded-lg"
-                                            autoPlay
-                                            controls
-                                            muted
-                                        />
+                                        localMediaStream.getVideoTracks().length > 0 ? (
+                                            <video
+                                                ref={(video) => video && (video.srcObject = localMediaStream)}
+                                                className="w-full h-full object-cover rounded-lg"
+                                                autoPlay
+                                                controls
+                                                muted
+                                            />
+                                        ) : (
+                                            <>
+                                                <img
+                                                    src={profilePictures[0]}
+                                                    alt={username}
+                                                    className="w-full h-full object-cover rounded-lg"
+                                                />
+                                                <audio
+                                                    ref={(audio) => audio && (audio.srcObject = localMediaStream)}
+                                                    autoPlay
+                                                    muted
+                                                    style={{ display: 'none' }}
+                                                />
+                                            </>
+                                        )
                                     ) : (
                                         <img
                                             src={profilePictures[0]}
@@ -562,26 +584,45 @@ const ChatRoom = () => {
                                         />
                                     )}
                                 </div>
-    
+
                                 {/* Vidéos des pairs */}
-                                {peers.map((peer, index) => (
-                                    <div key={index} className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
-                                        {peer.stream ? (
-                                            <video
-                                                ref={video => video && (video.srcObject = peer.stream)}
-                                                className="w-full h-full object-cover rounded-lg"
-                                                autoPlay
-                                                controls
-                                            />
-                                        ) : (
-                                            <img
-                                                src={profilePictures[1]}
-                                                alt={peer.username}
-                                                className="w-full h-full object-cover rounded-lg"
-                                            />
-                                        )}
-                                    </div>
-                                ))}
+                                {peers.map((peer, index) => {
+                                    const hasVideo = peer.stream && peer.stream.getVideoTracks().length > 0;
+                                    const hasAudio = peer.stream && peer.stream.getAudioTracks().length > 0;
+
+                                    return (
+                                        <div key={index} className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
+                                            {hasVideo ? (
+                                                <video
+                                                    ref={video => video && (video.srcObject = peer.stream)}
+                                                    className="w-full h-full object-cover rounded-lg"
+                                                    autoPlay
+                                                    controls
+                                                />
+                                            ) : hasAudio ? (
+                                                <div className="relative w-full h-full">
+                                                    <img
+                                                        src={profilePictures[1]}
+                                                        alt={peer.username}
+                                                        className="w-full h-full object-cover rounded-lg"
+                                                    />
+                                                    <audio
+                                                        ref={audio => audio && (audio.srcObject = peer.stream)}
+                                                        className="hidden"
+                                                        autoPlay
+                                                        controls
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <img
+                                                    src={profilePictures[1]}
+                                                    alt={peer.username}
+                                                    className="w-full h-full object-cover rounded-lg"
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div className="w-full p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4 text-white">
@@ -592,7 +633,7 @@ const ChatRoom = () => {
                                     </div>
                                 ))}
                             </div>
-    
+
                             {/* Boîte de messages */}
                             <div className="w-full h-[50%] p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4">
                                 {messages.length === 0 ? (
@@ -614,7 +655,7 @@ const ChatRoom = () => {
                                 )}
                                 <div ref={messagesEndRef} /> {/* Référence pour le scroll */}
                             </div>
-    
+
                             {/* Bouton pour activer/désactiver la traduction */}
                             <div className="flex justify-start mb-2">
                                 <button
@@ -624,7 +665,7 @@ const ChatRoom = () => {
                                     Translate conversation
                                 </button>
                             </div>
-    
+
                             {/* Formulaire de message */}
                             <form onSubmit={handleSendMessage} className="w-full">
                                 <div className="relative">
