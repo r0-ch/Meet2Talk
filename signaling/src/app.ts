@@ -44,7 +44,7 @@ app.get('/get-room', async (req, res) => {
         let room = await prisma.room.findFirst({
             where: {
                 userCount: {
-                    lt: 6
+                    lt: 4
                 }
             }
         });
@@ -52,7 +52,7 @@ app.get('/get-room', async (req, res) => {
         if (!room) {
             room = await prisma.room.create({
                 data: {
-                    maxUsers: 5,
+                    maxUsers: 4,
                     userCount: 0,
                 },
             });
