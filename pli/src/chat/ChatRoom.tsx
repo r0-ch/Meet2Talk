@@ -73,6 +73,7 @@ const ChatRoom = () => {
     ];
 
     const [translationEnabled, setTranslationEnabled] = useState(false);
+    const translationEnabledRef = useRef(false);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
     const [isLoading, setIsLoading] = useState(true);
@@ -251,7 +252,8 @@ const ChatRoom = () => {
             console.log('message', message);
 
             if (message.type === "message") {
-                if (translationEnabled) {
+                if (translationEnabledRef.current) {
+                    console.log('translating message...');
                     translate(message.content, selectedLanguage).then((translated) => {
                         setMessages((prevMessages) => [...prevMessages, { ...message, translated }]);
                     });
@@ -343,7 +345,8 @@ const ChatRoom = () => {
     }
 
     async function enableTranslation() {
-        setTranslationEnabled(!translationEnabled);
+        // setTranslationEnabled(!translationEnabled);
+        translationEnabledRef.current = !translationEnabledRef.current;
         // we retrieve all messages and translate them
         const translatedMessages = await Promise.all(messages.map(async (msg) => {
             if (msg.translated || msg.socketId === localSocketIdRef.current) {
@@ -623,7 +626,7 @@ const ChatRoom = () => {
                                                 className={`p-3 rounded-lg max-w-md break-words ${msg.socketId !== socketRef.current.id ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
                                             >
                                                 <span className="font-semibold block mb-1">{msg.username}:</span>
-                                                <span>{translationEnabled && msg.translated ? msg.translated : msg.content}</span>
+                                                <span>{translationEnabledRef.current && msg.translated ? msg.translated : msg.content}</span>
                                             </div>
                                         </div>
                                     ))
@@ -635,7 +638,7 @@ const ChatRoom = () => {
                             <div className="flex justify-start mb-2">
                                 <button
                                     onClick={async () => await enableTranslation()}
-                                    className={`${translationEnabled ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
+                                    className={`${translationEnabledRef.current ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
                                 >
                                     Translate conversation
                                 </button>
