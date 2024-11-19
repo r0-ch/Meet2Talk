@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation,useNavigate } from "react-router-dom";
 import Peer from "simple-peer";
 import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -42,7 +42,7 @@ async function loadIceServers() {
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
-
+    const navigate = useNavigate();
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const whisperSocketRef = useRef<Socket | null>(null);
@@ -127,6 +127,10 @@ const ChatRoom = () => {
                 handlePeer(remoteUser, true);
             });
         });
+
+        socket.on("cannot-join", () =>{
+            navigate("/")
+        })
 
         socket.on("user-joined", async (user: any) => {
             console.log('user-joined', user);
