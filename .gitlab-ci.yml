@@ -7,7 +7,7 @@ stages:
 
 workflow:
   rules:
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-k8s\s*$/
+  - if: $CI_COMMIT_MESSAGE =~ /\s*-k8s\s*/
 
 calculate_tag:
   stage: calculate_tag
@@ -29,7 +29,7 @@ calculate_tag:
   tags:
     - k8s
   rules:
-    - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*$/ || $CI_COMMIT_MESSAGE =~ /\s*-back\s*$/
+    - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*/ || $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
 
 
 
@@ -42,7 +42,7 @@ build_whisper:
   - 'echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"> /kaniko/.docker/config.json'
   - /kaniko/executor --context ./whisper  --dockerfile Dockerfile --destination crissime/whisper:latest --cache=true
   rules:
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-whisper\s*$/
+  - if: $CI_COMMIT_MESSAGE =~ /\s*-whisper\s*/
   tags:
     - build
 
@@ -59,7 +59,7 @@ build_dev:
     - build
   rules:
   - if: $CI_COMMIT_BRANCH != "main"
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*$/
+  - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*/
 
 
 build_back_dev:
@@ -74,7 +74,7 @@ build_back_dev:
     - build
   rules:
   - if: $CI_COMMIT_BRANCH != "main"
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-back\s*$/
+  - if: $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
 
 build_prod:
   stage: build_prod
@@ -108,7 +108,7 @@ deploy_to_dev:
     - k8s
   rules:
   - if: $CI_COMMIT_BRANCH != "main"
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*$/ || $CI_COMMIT_MESSAGE =~ /\s*-back\s*$/
+  - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*/ || $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
 
 deploy_to_prod:
   stage: deploy_prod
