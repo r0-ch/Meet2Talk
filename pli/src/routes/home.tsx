@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import config from "../loadenv";
 
 export default function Home() {
   const [username, setUsername] = useState("");
@@ -73,6 +74,7 @@ export default function Home() {
             Welcome to Meet2Talk
           </h1>
           <button
+            id="start-to-talk"
             onClick={toggleForm}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-3xl transition-transform transform hover:scale-105"
           >
@@ -93,6 +95,7 @@ export default function Home() {
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
+                id="username"
                 type="text"
                 placeholder="Enter your username"
                 value={username}
@@ -103,6 +106,7 @@ export default function Home() {
 
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <select
+                id="language"
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
                 className="w-full px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg"
@@ -118,6 +122,7 @@ export default function Home() {
               </select>
               <div className="w-full flex items-center">
                 <input
+                  id="tag"
                   type="text"
                   placeholder="Add a tag"
                   value={tagInput}
@@ -149,6 +154,7 @@ export default function Home() {
                 ))}
               </div>
               <button
+                id="join-room"
                 type="submit"
                 disabled={username.trim() === "" || selectedLanguage === ""}
                 className={`w-full py-2 rounded transition duration-300 ease-in-out transform hover:scale-105 ${
