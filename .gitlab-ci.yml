@@ -64,6 +64,7 @@ deploy_to_dev:
   - echo "Mise à jour des images pour l'environnement de développement..."
   - 'sed -i "s|image: crissime/pli-front:.*|image:crissime/pli-front:${TAG}|g" k8s-dev/front/deploy_front.yaml'
   - 'sed -i "s|image: crissime/pli-back:.*|image:crissime/pli-back:${TAG}|g" k8s-dev/backend/deploy_back.yaml'
+  - cat k8s-dev/front/deploy_front.yaml
   - kubectl apply -f k8s-dev/front --namespace=dev
   - kubectl apply -f k8s-dev/backend --namespace=dev
   rules:
