@@ -37,7 +37,6 @@ build_whisper:
   stage: build_dev
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
-  - TAG=$(cat NEW_TAG)
   - echo "Construction de l'application pour l'environnement de développement..."
   - 'echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"> /kaniko/.docker/config.json'
   - /kaniko/executor --context ./whisper  --dockerfile Dockerfile --destination crissime/whisper:latest --cache=true
@@ -58,8 +57,7 @@ build_dev:
   tags:
     - build
   rules:
-  - if: $CI_COMMIT_BRANCH != "main"
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*/
+  - if: $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_MESSAGE =~ /\s*-front\s*/
 
 
 build_back_dev:
@@ -73,8 +71,7 @@ build_back_dev:
   tags:
     - build
   rules:
-  - if: $CI_COMMIT_BRANCH != "main"
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
+  - if: $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
 
 build_prod:
   stage: build_prod
@@ -89,7 +86,6 @@ build_prod:
     - build
   rules:
   - if: $CI_COMMIT_BRANCH == "main"
-
 
 
 deploy_to_dev:
@@ -107,8 +103,7 @@ deploy_to_dev:
   tags:
     - k8s
   rules:
-  - if: $CI_COMMIT_BRANCH != "main"
-  - if: $CI_COMMIT_MESSAGE =~ /\s*-front\s*/ || $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
+  - if: $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_MESSAGE =~ /\s*-front\s*/ || $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
 
 deploy_to_prod:
   stage: deploy_prod
