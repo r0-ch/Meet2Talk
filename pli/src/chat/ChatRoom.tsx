@@ -47,7 +47,6 @@ const ChatRoom = () => {
     const localSocketIdRef = useRef<string | null>(null);
     const whisperSocketRef = useRef<Socket | null>(null);
     const localMediaStreamRef = useRef<MediaStream | null>(null);
-    const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null);
 
     const peersRef = useRef<any[]>([]);
     const [peers, setPeers] = useState<any[]>([]);
@@ -118,7 +117,6 @@ const ChatRoom = () => {
             console.log("Getting local stream...");
             const media = await getLocalStream();
             localMediaStreamRef.current = media;
-            setLocalMediaStream(media);
             console.log("Local stream acquired.");
 
             handleTranscription(media);
@@ -562,10 +560,10 @@ const ChatRoom = () => {
                             <div className={`flex flex-wrap justify-center gap-4 p-4`}>
                                 {/* Vidéo utilisateur local */}
                                 <div className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
-                                    {localMediaStream ? (
-                                        localMediaStream.getVideoTracks().length > 0 ? (
+                                    {localMediaStreamRef.current ? (
+                                        localMediaStreamRef.current.getVideoTracks().length > 0 ? (
                                             <video
-                                                ref={(video) => video && (video.srcObject = localMediaStream)}
+                                                ref={(video) => video && (video.srcObject = localMediaStreamRef.current)}
                                                 className="w-full h-full object-cover rounded-lg"
                                                 autoPlay
                                                 controls
@@ -579,7 +577,7 @@ const ChatRoom = () => {
                                                     className="w-full h-full object-cover rounded-lg"
                                                 />
                                                 <audio
-                                                    ref={(audio) => audio && (audio.srcObject = localMediaStream)}
+                                                    ref={(audio) => audio && (audio.srcObject = localMediaStreamRef.current)}
                                                     autoPlay
                                                     muted
                                                     style={{ display: 'none' }}
