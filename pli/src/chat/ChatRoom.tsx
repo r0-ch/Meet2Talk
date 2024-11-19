@@ -1,11 +1,13 @@
 import { io, Socket } from "socket.io-client";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation,useNavigate } from "react-router-dom";
 import Peer from "simple-peer";
 import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import RecordRTC from "recordrtc";
 import config from "../loadenv";
+
+import PeerVideo from "./PeerVideo";
 
 interface RemotePeer {
     socketId: string;
@@ -41,12 +43,11 @@ async function loadIceServers() {
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
-
+    const navigate = useNavigate();
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const whisperSocketRef = useRef<Socket | null>(null);
     const localMediaStreamRef = useRef<MediaStream | null>(null);
-    const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null);
 
     const peersRef = useRef<any[]>([]);
     const [peers, setPeers] = useState<any[]>([]);
@@ -72,6 +73,7 @@ const ChatRoom = () => {
     ];
 
     const [translationEnabled, setTranslationEnabled] = useState(false);
+    const translationEnabledRef = useRef(false);
     const [isChatExpanded, setIsChatExpanded] = useState(false);
     const [isSidebarVisible, setIsSidebarVisible] = useState(false); // État pour la visibilité de la sidebar
     const [isLoading, setIsLoading] = useState(true);
@@ -116,7 +118,6 @@ const ChatRoom = () => {
             console.log("Getting local stream...");
             const media = await getLocalStream();
             localMediaStreamRef.current = media;
-            setLocalMediaStream(media);
             console.log("Local stream acquired.");
 
             handleTranscription(media);
@@ -127,6 +128,10 @@ const ChatRoom = () => {
                 handlePeer(remoteUser, true);
             });
         });
+
+        socket.on("cannot-join", () =>{
+            navigate("/")
+        })
 
         socket.on("user-joined", async (user: any) => {
             console.log('user-joined', user);
@@ -196,6 +201,7 @@ const ChatRoom = () => {
             peer: remotePeer,
             socketId: user.socketId,
             username: user.username,
+            profilePicture: allProfilePictures[Math.floor(Math.random() * allProfilePictures.length)],
             isConnected: false
         };
 
@@ -249,8 +255,14 @@ const ChatRoom = () => {
             console.log('message', message);
 
             if (message.type === "message") {
-                setMessages((prevMessages) => [...prevMessages, message]);
-
+                if (translationEnabledRef.current) {
+                    console.log('translating message...');
+                    translate(message.content, selectedLanguage).then((translated) => {
+                        setMessages((prevMessages) => [...prevMessages, { ...message, translated }]);
+                    });
+                } else {
+                    setMessages((prevMessages) => [...prevMessages, message]);
+                }
             } else if (message.type === "transcription") {
                 setTranscriptions((prevTranscriptions) => [...prevTranscriptions, message]);
                 setLastTranscriptions((prevLastTranscriptions) => ({
@@ -336,7 +348,8 @@ const ChatRoom = () => {
     }
 
     async function enableTranslation() {
-        setTranslationEnabled(!translationEnabled);
+        // setTranslationEnabled(!translationEnabled);
+        translationEnabledRef.current = !translationEnabledRef.current;
         // we retrieve all messages and translate them
         const translatedMessages = await Promise.all(messages.map(async (msg) => {
             if (msg.translated || msg.socketId === localSocketIdRef.current) {
@@ -552,10 +565,10 @@ const ChatRoom = () => {
                             <div className={`flex flex-wrap justify-center gap-4 p-4`}>
                                 {/* Vidéo utilisateur local */}
                                 <div className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
-                                    {localMediaStream ? (
-                                        localMediaStream.getVideoTracks().length > 0 ? (
+                                    {localMediaStreamRef.current ? (
+                                        localMediaStreamRef.current.getVideoTracks().length > 0 ? (
                                             <video
-                                                ref={(video) => video && (video.srcObject = localMediaStream)}
+                                                ref={(video) => video && (video.srcObject = localMediaStreamRef.current)}
                                                 className="w-full h-full object-cover rounded-lg"
                                                 autoPlay
                                                 controls
@@ -569,7 +582,7 @@ const ChatRoom = () => {
                                                     className="w-full h-full object-cover rounded-lg"
                                                 />
                                                 <audio
-                                                    ref={(audio) => audio && (audio.srcObject = localMediaStream)}
+                                                    ref={(audio) => audio && (audio.srcObject = localMediaStreamRef.current)}
                                                     autoPlay
                                                     muted
                                                     style={{ display: 'none' }}
@@ -587,40 +600,8 @@ const ChatRoom = () => {
 
                                 {/* Vidéos des pairs */}
                                 {peers.map((peer, index) => {
-                                    const hasVideo = peer.stream && peer.stream.getVideoTracks().length > 0;
-                                    const hasAudio = peer.stream && peer.stream.getAudioTracks().length > 0;
-
                                     return (
-                                        <div key={index} className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
-                                            {hasVideo ? (
-                                                <video
-                                                    ref={video => video && (video.srcObject = peer.stream)}
-                                                    className="w-full h-full object-cover rounded-lg"
-                                                    autoPlay
-                                                    controls
-                                                />
-                                            ) : hasAudio ? (
-                                                <div className="relative w-full h-full">
-                                                    <img
-                                                        src={profilePictures[1]}
-                                                        alt={peer.username}
-                                                        className="w-full h-full object-cover rounded-lg"
-                                                    />
-                                                    <audio
-                                                        ref={audio => audio && (audio.srcObject = peer.stream)}
-                                                        className="hidden"
-                                                        autoPlay
-                                                        controls
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <img
-                                                    src={profilePictures[1]}
-                                                    alt={peer.username}
-                                                    className="w-full h-full object-cover rounded-lg"
-                                                />
-                                            )}
-                                        </div>
+                                        <PeerVideo key={index} peer={peer} />
                                     );
                                 })}
                             </div>
@@ -648,7 +629,7 @@ const ChatRoom = () => {
                                                 className={`p-3 rounded-lg max-w-md break-words ${msg.socketId !== socketRef.current.id ? 'bg-gray-700' : 'bg-blue-500'} text-gray-200`}
                                             >
                                                 <span className="font-semibold block mb-1">{msg.username}:</span>
-                                                <span>{translationEnabled && msg.translated ? msg.translated : msg.content}</span>
+                                                <span>{translationEnabledRef.current && msg.translated ? msg.translated : msg.content}</span>
                                             </div>
                                         </div>
                                     ))
@@ -660,7 +641,7 @@ const ChatRoom = () => {
                             <div className="flex justify-start mb-2">
                                 <button
                                     onClick={async () => await enableTranslation()}
-                                    className={`${translationEnabled ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
+                                    className={`${translationEnabledRef.current ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
                                 >
                                     Translate conversation
                                 </button>

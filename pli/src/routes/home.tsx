@@ -37,7 +37,7 @@ export default function Home() {
       return;
     }
     setError("");
-    const room = await fetch(config.backurl + "/get-room").then((res) => res.json());
+    const room = await fetch(import.meta.env.VITE_REACT_APP_BACKEND + "/api/get-room").then((res) => res.json());
 
     navigate(`/room/${room.id}`, { state: { username, selectedLanguage } });
   };
