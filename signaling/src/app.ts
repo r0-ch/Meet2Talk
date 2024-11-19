@@ -144,6 +144,7 @@ io.on('connection', (socket) => {
                 socketId: socketId
             }
         });
+        
 
         socket.to(socketId).emit('transcription-requested', ({ socketId: socket.id, enabled: enabled }));
     });
