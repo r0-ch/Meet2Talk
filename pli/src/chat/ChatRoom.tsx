@@ -5,6 +5,7 @@ import Peer from "simple-peer";
 import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import RecordRTC from "recordrtc";
+import config from "../loadenv";
 
 interface RemotePeer {
     socketId: string;
@@ -81,15 +82,15 @@ const ChatRoom = () => {
     };
 
     useEffect(() => {
-        console.log(`api: ${import.meta.env.VITE_REACT_APP_BACKEND}`);
+        console.log(`api: ${config.backurl}`);
 
-        const socket = io(`${new URL(import.meta.env.VITE_REACT_APP_BACKEND as string).origin}`, {
+        const socket = io(`${new URL(config.backurl).origin}`, {
             withCredentials: true,
         });
         socketRef.current = socket;
         localSocketIdRef.current = socket.id;
 
-        const whisperSocket= io(`${new URL(import.meta.env.VITE_REACT_APP_WHISPER as string).origin}`, {
+        const whisperSocket= io(`${new URL(config.whisperurl).origin}`, {
             path: '/socket.io/whisper',
         });
         whisperSocketRef.current = whisperSocket;
@@ -504,7 +505,7 @@ const ChatRoom = () => {
                         >
                             <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
                             <ul className="space-y-2">
-                                <h4 className="text-white text-xl">{username}</h4>
+                                <h4 id="usernames" className="text-white text-xl">{username}</h4>
                                 {peers.map((peer, index) => (
                                     <div key={index}>
                                         <h4 className="text-white text-xl">{peer.username}</h4>
