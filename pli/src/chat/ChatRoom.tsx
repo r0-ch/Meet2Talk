@@ -6,6 +6,8 @@ import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import RecordRTC from "recordrtc";
 
+import PeerVideo from "./PeerVideo";
+
 interface RemotePeer {
     socketId: string;
     username: string;
@@ -195,6 +197,7 @@ const ChatRoom = () => {
             peer: remotePeer,
             socketId: user.socketId,
             username: user.username,
+            profilePicture: allProfilePictures[Math.floor(Math.random() * allProfilePictures.length)],
             isConnected: false
         };
 
@@ -248,8 +251,13 @@ const ChatRoom = () => {
             console.log('message', message);
 
             if (message.type === "message") {
-                setMessages((prevMessages) => [...prevMessages, message]);
-
+                if (translationEnabled) {
+                    translate(message.content, selectedLanguage).then((translated) => {
+                        setMessages((prevMessages) => [...prevMessages, { ...message, translated }]);
+                    });
+                } else {
+                    setMessages((prevMessages) => [...prevMessages, message]);
+                }
             } else if (message.type === "transcription") {
                 setTranscriptions((prevTranscriptions) => [...prevTranscriptions, message]);
                 setLastTranscriptions((prevLastTranscriptions) => ({
@@ -586,40 +594,8 @@ const ChatRoom = () => {
 
                                 {/* Vidéos des pairs */}
                                 {peers.map((peer, index) => {
-                                    const hasVideo = peer.stream && peer.stream.getVideoTracks().length > 0;
-                                    const hasAudio = peer.stream && peer.stream.getAudioTracks().length > 0;
-
                                     return (
-                                        <div key={index} className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
-                                            {hasVideo ? (
-                                                <video
-                                                    ref={video => video && (video.srcObject = peer.stream)}
-                                                    className="w-full h-full object-cover rounded-lg"
-                                                    autoPlay
-                                                    controls
-                                                />
-                                            ) : hasAudio ? (
-                                                <div className="relative w-full h-full">
-                                                    <img
-                                                        src={profilePictures[1]}
-                                                        alt={peer.username}
-                                                        className="w-full h-full object-cover rounded-lg"
-                                                    />
-                                                    <audio
-                                                        ref={audio => audio && (audio.srcObject = peer.stream)}
-                                                        className="hidden"
-                                                        autoPlay
-                                                        controls
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <img
-                                                    src={profilePictures[1]}
-                                                    alt={peer.username}
-                                                    className="w-full h-full object-cover rounded-lg"
-                                                />
-                                            )}
-                                        </div>
+                                        <PeerVideo key={index} peer={peer} />
                                     );
                                 })}
                             </div>
