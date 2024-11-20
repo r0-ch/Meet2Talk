@@ -25,6 +25,7 @@ case $TYPE in
     PATCH=0
     ;;
   minor)
+    MAJOR=1
     MINOR=$((MINOR + 1))
     PATCH=0
     ;;
