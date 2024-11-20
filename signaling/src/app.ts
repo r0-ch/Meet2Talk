@@ -44,7 +44,7 @@ app.get('/get-room', async (req, res) => {
         let room = await prisma.room.findFirst({
             where: {
                 userCount: {
-                    lt: 6
+                    lt: 4
                 }
             }
         });
@@ -52,7 +52,7 @@ app.get('/get-room', async (req, res) => {
         if (!room) {
             room = await prisma.room.create({
                 data: {
-                    maxUsers: 5,
+                    maxUsers: 4,
                     userCount: 0,
                 },
             });
@@ -90,8 +90,18 @@ io.on('connection', (socket) => {
 
     socket.on('join-room', async ({ roomId, username }, callback) => {
         console.log('join-room', socket.id, username);
+        
+        const otherUsers = await prisma.socket.findMany({
+            where: {
+                roomId: roomId,
+            }
+        });
+        if(otherUsers.length > 3){
+           socket.emit("cannot-join")
+           return;
+        }
+        
         socket.join(roomId);
-
         await prisma.room.update({
             where: {
                 id: roomId
@@ -116,14 +126,7 @@ io.on('connection', (socket) => {
         });
         socket.to(roomId).emit('user-joined', user);
 
-        const otherUsers = await prisma.socket.findMany({
-            where: {
-                roomId: roomId,
-                socketId: {
-                    not: socket.id
-                }
-            }
-        });
+        
 
         callback(otherUsers);
     });
@@ -141,6 +144,7 @@ io.on('connection', (socket) => {
                 socketId: socketId
             }
         });
+        
 
         socket.to(socketId).emit('transcription-requested', ({ socketId: socket.id, enabled: enabled }));
     });

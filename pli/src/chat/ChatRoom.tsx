@@ -1,10 +1,11 @@
 import { io, Socket } from "socket.io-client";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation,useNavigate } from "react-router-dom";
 import Peer from "simple-peer";
 import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import RecordRTC from "recordrtc";
+import config from "../loadenv";
 
 import PeerVideo from "./PeerVideo";
 import { usePeersContext } from "./PeersContext";
@@ -46,12 +47,11 @@ async function loadIceServers() {
 const ChatRoom = () => {
     const { roomId } = useParams<{ roomId: string }>();
     const { username = 'Guest', selectedLanguage = "en" } = useLocation().state as { username: string, selectedLanguage: string } || {};
-
+    const navigate = useNavigate();
     const socketRef = useRef<Socket | null>(null);
     const localSocketIdRef = useRef<string | null>(null);
     const whisperSocketRef = useRef<Socket | null>(null);
     const localMediaStreamRef = useRef<MediaStream | null>(null);
-    const [localMediaStream, setLocalMediaStream] = useState<MediaStream | null>(null);
 
     const peersRef = useRef<any[]>([]);
     // const [peers, setPeers] = useState<any[]>([]);
@@ -89,15 +89,15 @@ const ChatRoom = () => {
     };
 
     useEffect(() => {
-        console.log(`api: ${import.meta.env.VITE_REACT_APP_BACKEND}`);
+        console.log(`api: ${config.backurl}`);
 
-        const socket = io(`${new URL(import.meta.env.VITE_REACT_APP_BACKEND as string).origin}`, {
+        const socket = io(`${new URL(config.backurl).origin}`, {
             withCredentials: true,
         });
         socketRef.current = socket;
         localSocketIdRef.current = socket.id;
 
-        const whisperSocket = io(`${new URL(import.meta.env.VITE_REACT_APP_WHISPER as string).origin}`, {
+        const whisperSocket= io(`${new URL(config.whisperurl).origin}`, {
             path: '/socket.io/whisper',
         });
         whisperSocketRef.current = whisperSocket;
@@ -123,7 +123,6 @@ const ChatRoom = () => {
             console.log("Getting local stream...");
             const media = await getLocalStream();
             localMediaStreamRef.current = media;
-            setLocalMediaStream(media);
             console.log("Local stream acquired.");
 
             handleTranscription(media);
@@ -134,6 +133,10 @@ const ChatRoom = () => {
                 handlePeer(remoteUser, true);
             });
         });
+
+        socket.on("cannot-join", () =>{
+            navigate("/")
+        })
 
         socket.on("user-joined", async (user: any) => {
             console.log('user-joined', user);
@@ -534,7 +537,7 @@ const ChatRoom = () => {
                         >
                             <h3 className="text-lg font-semibold text-gray-400 mb-4">Users in Room</h3>
                             <ul className="space-y-2">
-                                <h4 className="text-white text-xl">{username}</h4>
+                                <h4 id="usernames" className="text-white text-xl">{username}</h4>
                                 {peers.map((peer, index) => (
                                     <div key={index}>
                                         <h4 className="text-white text-xl">{peer.username}</h4>
@@ -577,10 +580,10 @@ const ChatRoom = () => {
                             <div className={`flex flex-wrap justify-center gap-4 p-4`}>
                                 {/* Vidéo utilisateur local */}
                                 <div className="flex items-center justify-center bg-gray-800 rounded-lg aspect-video min-w-52 max-w-80">
-                                    {localMediaStream ? (
-                                        localMediaStream.getVideoTracks().length > 0 ? (
+                                    {localMediaStreamRef.current ? (
+                                        localMediaStreamRef.current.getVideoTracks().length > 0 ? (
                                             <video
-                                                ref={(video) => video && (video.srcObject = localMediaStream)}
+                                                ref={(video) => video && (video.srcObject = localMediaStreamRef.current)}
                                                 className="w-full h-full object-cover rounded-lg"
                                                 autoPlay
                                                 muted
@@ -593,7 +596,7 @@ const ChatRoom = () => {
                                                     className="w-full h-full object-cover rounded-lg"
                                                 />
                                                 <audio
-                                                    ref={(audio) => audio && (audio.srcObject = localMediaStream)}
+                                                    ref={(audio) => audio && (audio.srcObject = localMediaStreamRef.current)}
                                                     autoPlay
                                                     muted
                                                     style={{ display: 'none' }}
