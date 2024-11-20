@@ -5,6 +5,8 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import Home from './routes/home';
 import ChatRoom from './chat/ChatRoom';
 
+import { PeersProvider } from './chat/PeersContext';
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
@@ -21,5 +23,7 @@ const router = createBrowserRouter([
 ]);
 
 root.render(
-  <RouterProvider router={router} />
+  <PeersProvider>
+    <RouterProvider router={router} />
+  </PeersProvider>
 );
