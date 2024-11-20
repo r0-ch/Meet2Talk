@@ -53,7 +53,7 @@ build_dev:
   - echo TAG
   - echo "Construction de l'application pour l'environnement de développement..."
   - 'echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"> /kaniko/.docker/config.json'
-  - /kaniko/executor --context ./pli --build-arg VITE_REACT_APP_BACKEND=https://pli-dev.ketsuna.com --dockerfile Dockerfile --destination crissime/pli-front:${TAG} --cache=true
+  - /kaniko/executor --context ./pli --build-arg VITE_REACT_APP_BACKEND=https://pli-dev.ketsuna.com --build-arg VITE_REACT_APP_WHISPER=https://pli-dev.ketsuna.com --dockerfile Dockerfile --destination crissime/pli-front:${TAG} --cache=true
   tags:
     - build
   rules:
