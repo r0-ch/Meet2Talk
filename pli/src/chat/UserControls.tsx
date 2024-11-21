@@ -5,9 +5,10 @@ interface UserControlsProps {
     socketId: string;
     onVolumeChange: (volume: number) => void;
     onClose: () => void;
+    toggleTranscription: (peer) => void;
 }
 
-const UserControls: React.FC<UserControlsProps> = ({ socketId, onVolumeChange, onClose }) => {
+const UserControls: React.FC<UserControlsProps> = ({ socketId, onVolumeChange, onClose, toggleTranscription }) => {
     const { peers } = usePeersContext();
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +63,14 @@ const UserControls: React.FC<UserControlsProps> = ({ socketId, onVolumeChange, o
                     className="mt-1 w-full"
                 />
                 <p className="text-xs mt-1 text-gray-500">Volume: {Math.round(volume * 100)}%</p>
+            </div>
+            <div>
+                <button
+                    onClick={() => toggleTranscription(peer)}
+                    className="w-full py-2 text-sm text-left px-4 hover:bg-gray-100 focus:outline-none"
+                >
+                    Toggle Transcription
+                </button>
             </div>
         </div>
     );
