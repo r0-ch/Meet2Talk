@@ -1,9 +1,11 @@
 import React from "react";
 import { usePeersContext } from "./PeersContext";
 import UserCard from "./UserCard";
+import { useNavigate } from "react-router-dom";
 
 const Sidebar = ({ username, isSidebarVisible }) => {
     const {peers} = usePeersContext()
+    const navigate = useNavigate()
 
     return (
         <div
@@ -26,14 +28,13 @@ const Sidebar = ({ username, isSidebarVisible }) => {
                     ))}
                 </ul>
             </div>
-
             {/* Footer */}
             <div className="absolute bottom-0 left-0 w-full bg-gray-900 p-4 border-t border-gray-700">
                 <button
                     className="w-full text-sm text-gray-400 hover:text-white transition"
-                    onClick={() => console.log("Add functionality for logout/settings")}
+                    onClick={() => navigate("/")}
                 >
-                    Settings / Logout
+                    Logout
                 </button>
             </div>
         </div>
