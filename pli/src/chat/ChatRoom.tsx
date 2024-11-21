@@ -64,7 +64,6 @@ const ChatRoom = () => {
     const [transcriptions, setTranscriptions] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
     const [lastTranscriptions, setLastTranscriptions] = useState<{}>({});
     const [transcriptionsPerUser, setTranscriptionsPerUser] = useState({});
-    const [test, setTest] = useState({});
     interface TranscriptionsPerUser {
         [socketId: string]: {
             username: string;
@@ -285,16 +284,6 @@ const ChatRoom = () => {
                     });
                 } else {
                     setMessages((prevMessages) => [...prevMessages, message]);
-                    setTest((prev) => {
-                        console.log('test', prev);
-                        return {
-                            ...prev,
-                            [message.socketId]: {
-                                username: message.username,
-                                messages: [...prev[message.socketId]?.messages || [], message]
-                            }
-                        }
-                    })
                 }
             } else if (message.type === "transcription") {
                 setTranscriptions((prevTranscriptions) => [...prevTranscriptions, message]);
