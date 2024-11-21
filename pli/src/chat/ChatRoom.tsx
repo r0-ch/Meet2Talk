@@ -569,6 +569,7 @@ const ChatRoom = () => {
                 <div className="relative flex items-center justify-center h-screen bg-gray-900">
                     {/* Image de fond floutée */}
                     <div
+                        aria-label="Background"
                         className="absolute inset-0 bg-cover bg-center"
                         style={{ backgroundImage: `url(${('/worldwide.jpg')})`, filter: 'blur(3px)' }}
                     />
@@ -597,6 +598,7 @@ const ChatRoom = () => {
                         {/* Bouton pour cacher/montrer la sidebar */}
                         <div className="absolute z-50 top-4 left-4 flex items-center">
                             <button
+                                aria-label="Toggle sidebar"   
                                 onClick={() => setIsSidebarVisible(!isSidebarVisible)}
                                 className="text-gray-300 bg-blue-500 px-3 py-2 rounded hover:bg-blue-600 transition"
                             >
@@ -628,6 +630,7 @@ const ChatRoom = () => {
                                     {localMediaStreamRef.current ? (
                                         localMediaStreamRef.current.getVideoTracks().length > 0 ? (
                                             <video
+                                                aria-label="Users cameras"
                                                 ref={(video) => video && (video.srcObject = localMediaStreamRef.current)}
                                                 className="w-full h-full object-cover rounded-lg"
                                                 autoPlay
@@ -683,11 +686,13 @@ const ChatRoom = () => {
 
                                         return (
                                             <div
+                                                aria-label="Transcription's container"
                                                 key={key}
                                                 className="flex-1 flex flex-col justify-between rounded-lg shadow-lg bg-gray-700 bg-opacity-80 border border-gray-600 p-2 w-[300px] max-w-[400px] transition-all hover:scale-105 hover:shadow-xl">
                                                 {/* Conteneur scrollable des messages */}
                                                 <ul
                                                     ref={(el) => (scrollRefs.current[key] = el)}
+                                                    aria-label="Users transcriptions"
                                                     className="h-[8em] flex flex-col overflow-y-auto p-2 w-full space-y-2">
                                                     <div className="mt-auto">
                                                         {(value as any).messages.map((msg: any, index: number) => (
@@ -718,12 +723,13 @@ const ChatRoom = () => {
                             </div>
 
                             {/* Boîte de messages */}
-                            <div className="w-full h-[50%] p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4">
+                            <div aria-label="Messages's container" className="w-full h-[50%] p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4">
                                 {messages.length === 0 ? (
                                     <p className="text-gray-300 text-center">No message</p>
                                 ) : (
                                     messages.map((msg, index) => (
                                         <div
+                                            aria-label="Users messages"
                                             key={index}
                                             className={`flex items-center mb-3 ${msg.socketId !== socketRef.current.id ? 'justify-start' : 'justify-end'}`}
                                         >
@@ -742,6 +748,7 @@ const ChatRoom = () => {
                             {/* Bouton pour activer/désactiver la traduction */}
                             <div className="flex justify-start mb-2">
                                 <button
+                                    aria-label="Toggle translate mode"
                                     onClick={async () => await enableTranslation()}
                                     className={`${translationEnabledRef.current ? 'text-green-600 hover:text-green-700' : 'text-red-600 hover:text-red-700'}`}
                                 >
@@ -753,12 +760,14 @@ const ChatRoom = () => {
                             <form onSubmit={handleSendMessage} className="w-full">
                                 <div className="relative">
                                     <input
+                                        aria-label="Write a new message"
                                         ref={currentMessageRef}
                                         type="text"
                                         className="w-full p-3 rounded-lg bg-gray-700 text-gray-200 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 shadow"
                                         placeholder="Write a message..."
                                     />
                                     <button
+                                        aria-label="Send the message"
                                         type="submit"
                                         className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition"
                                     >
