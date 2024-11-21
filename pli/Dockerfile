@@ -12,8 +12,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
-
-ENV VITE_REACT_APP_BACKEND=https://pli.ketsuna.com/api
+ARG VITE_REACT_APP_BACKEND=http://localhost:8000
+ARG VITE_REACT_APP_WHISPER=http://localhost:5000
 
 RUN npm run build
 

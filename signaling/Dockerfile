@@ -12,8 +12,7 @@ RUN npm ci --omit=dev && npx prisma db push
 FROM deps as build
 
 COPY tsconfig.json ./
-
-ENV CORS_ORIGIN=pli.ketsuna.com
+ARG CORS_ORIGIN=pli.ketsuna.com
 # Install all dependencies (both production and dev)
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -26,7 +25,7 @@ FROM base as production
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./
-COPY --from=build /app/prisma ./prisma
+COPY --from=deps /app/dev.db ./
 EXPOSE 8000
 
 CMD ["node", "app.js"]

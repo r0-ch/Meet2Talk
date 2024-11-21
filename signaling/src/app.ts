@@ -44,7 +44,7 @@ app.get('/get-room', async (req, res) => {
         let room = await prisma.room.findFirst({
             where: {
                 userCount: {
-                    lt: 6
+                    lt: 4
                 }
             }
         });
@@ -52,7 +52,7 @@ app.get('/get-room', async (req, res) => {
         if (!room) {
             room = await prisma.room.create({
                 data: {
-                    maxUsers: 5,
+                    maxUsers: 4,
                     userCount: 0,
                 },
             });
@@ -87,8 +87,20 @@ app.get('/get-room/:id', async (req, res) => {
 
 
 io.on('connection', (socket) => {
-    socket.on('join-room', async ({ roomId, username }) => {
+
+    socket.on('join-room', async ({ roomId, username }, callback) => {
         console.log('join-room', socket.id, username);
+        
+        const otherUsers = await prisma.socket.findMany({
+            where: {
+                roomId: roomId,
+            }
+        });
+        if(otherUsers.length > 3){
+           socket.emit("cannot-join")
+           return;
+        }
+        
         socket.join(roomId);
         await prisma.room.update({
             where: {
@@ -106,36 +118,37 @@ io.on('connection', (socket) => {
                 }
             }
         });
-        socket.to(roomId).emit('user-connected', {
-            socketId: socket.id,
-            username: username
+
+        const user = await prisma.socket.findUnique({
+            where: {
+                socketId: socket.id
+            }
         });
+        socket.to(roomId).emit('user-joined', user);
+
+        
+
+        callback(otherUsers);
     });
 
-    socket.on('offer', ({ socketId, offer, username }) => {
-        console.log('offer', username)
-        socket.to(socketId).emit('offer', {
-            by: socket.id,
-            offer: offer,
-            username: username
-        });
+    socket.on('send-signal', async ({ to, signal, from }) => {
+        console.log('send-signal', to, signal, from);
+        socket.to(to).emit('receive-signal', { signal, from });
     });
 
-    socket.on('answer', ({ socketId, answer }) => {
-        console.log('answer', socketId);
-        socket.to(socketId).emit('answer', {
-            by: socket.id,
-            answer: answer
+    socket.on('toggle-transcription', ({socketId, enabled}) => {
+        console.log('transcription enabled', enabled, 'for', socketId);
+
+        const user = prisma.socket.findUnique({
+            where: {
+                socketId: socketId
+            }
         });
+        
+
+        socket.to(socketId).emit('transcription-requested', ({ socketId: socket.id, enabled: enabled }));
     });
 
-    socket.on('ice-candidate', ({ socketId, candidate }) => {
-        console.log('ice-candidate', socketId);
-        socket.to(socketId).emit('ice-candidate', {
-            by: socket.id,
-            candidate: candidate
-        });
-    });
 
     socket.on('disconnect', async () => {
 

@@ -23,14 +23,14 @@ model Room {
 }
 
 model Socket {
-  room      Room     @relation(fields: [roomId], references: [id])
-  roomId    String
-  socketId  String   @id
-  username  String   @default("Guest")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  room                 Room     @relation(fields: [roomId], references: [id])
+  roomId               String
+  socketId             String   @id
+  username             String   @default("Guest")
+  transcriptionEnabled Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
-
 
 model Reports {
   id        String   @id @default(cuid())
@@ -39,4 +39,3 @@ model Reports {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
