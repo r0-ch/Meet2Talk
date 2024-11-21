@@ -1,0 +1,5 @@
+faster_whisper
+python-socketio[asyncio]
+uvicorn
+fastapi[standard]
+python-dotenv
