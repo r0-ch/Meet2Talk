@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useLocation,useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import Peer from "simple-peer";
 import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -8,15 +8,20 @@ import RecordRTC from "recordrtc";
 import config from "../loadenv";
 
 import PeerVideo from "./PeerVideo";
+import { usePeersContext } from "./PeersContext";
+import Sidebar from "./Sidebar";
+import TranscriptionsDisplay from "./TranscriptionsDisplay";
 
 interface RemotePeer {
-    socketId: string;
-    username: string;
-    peer: Peer.Instance;
+    socketId?: string;
+    username?: string;
+    profilePicture?: string;
+    peer?: Peer.Instance;
     stream?: MediaStream | null;
-    profilePicture: string;
+    videoElement?: HTMLVideoElement | null;
+    audioElement?: HTMLAudioElement | null;
+    volume?: number | null;
 }
-
 
 let iceServers: any[] = []
 
@@ -50,13 +55,22 @@ const ChatRoom = () => {
     const localMediaStreamRef = useRef<MediaStream | null>(null);
 
     const peersRef = useRef<any[]>([]);
-    const [peers, setPeers] = useState<any[]>([]);
+    // const [peers, setPeers] = useState<any[]>([]);
+    const { peers, dispatch } = usePeersContext();
 
     const [messages, setMessages] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
     const currentMessageRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
     const [transcriptions, setTranscriptions] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
     const [lastTranscriptions, setLastTranscriptions] = useState<{}>({});
+    const [transcriptionsPerUser, setTranscriptionsPerUser] = useState({});
+    interface TranscriptionsPerUser {
+        [socketId: string]: {
+            username: string;
+            messages: { content: string }[];
+        };
+    }
+
 
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
     const allProfilePictures = [
@@ -84,6 +98,9 @@ const ChatRoom = () => {
     };
 
     useEffect(() => {
+        console.log(`roomId: ${roomId}`);
+        console.log(`username: ${username}`);
+        console.log(`selectedLanguage: ${selectedLanguage}`);
         console.log(`api: ${config.backurl}`);
 
         const socket = io(`${new URL(config.backurl).origin}`, {
@@ -92,7 +109,7 @@ const ChatRoom = () => {
         socketRef.current = socket;
         localSocketIdRef.current = socket.id;
 
-        const whisperSocket= io(`${new URL(config.whisperurl).origin}`, {
+        const whisperSocket = io(`${new URL(config.whisperurl).origin}`, {
             path: '/socket.io/whisper',
         });
         whisperSocketRef.current = whisperSocket;
@@ -111,9 +128,9 @@ const ChatRoom = () => {
 
             setIsLoading(true);
 
-            // console.log("Loading ICE servers...");
-            // await loadIceServers();
-            // console.log("ICE servers loaded.");
+            console.log("Loading ICE servers...");
+            await loadIceServers();
+            console.log("ICE servers loaded.");
 
             console.log("Getting local stream...");
             const media = await getLocalStream();
@@ -129,7 +146,7 @@ const ChatRoom = () => {
             });
         });
 
-        socket.on("cannot-join", () =>{
+        socket.on("cannot-join", () => {
             navigate("/")
         })
 
@@ -154,12 +171,14 @@ const ChatRoom = () => {
                 peer.transcriptionRequested = enabled;
             }
 
-            setPeers((prevPeers) => prevPeers.map((p) => {
-                if (p.socketId === socketId) {
-                    return peer;
-                }
-                return p;
-            }));
+            // setPeers((prevPeers) => prevPeers.map((p) => {
+            //     if (p.socketId === socketId) {
+            //         return peer;
+            //     }
+            //     return p;
+            // }));
+
+            dispatch({ type: "updatePeer", payload: { socketId, transcriptionRequested: enabled } });
 
             console.log('transcription-requested', socketId, enabled);
         });
@@ -192,9 +211,9 @@ const ChatRoom = () => {
             initiator: initiator,
             trickle: false,
             stream: localMediaStreamRef.current,
-            // config: {
-            //     iceServers: iceServers
-            // }
+            config: {
+                iceServers: iceServers
+            }
         });
 
         const peer = {
@@ -206,7 +225,8 @@ const ChatRoom = () => {
         };
 
         peersRef.current.push(peer);
-        setPeers((prevPeers) => [...prevPeers, peer]);
+        // setPeers((prevPeers) => [...prevPeers, peer]);
+        dispatch({ type: "addPeer", payload: peer });
 
         remotePeer.on("connect", () => {
             console.log('peer', peer.socketId, 'connected')
@@ -222,7 +242,8 @@ const ChatRoom = () => {
 
             peersRef.current = updatedPeers;
 
-            setPeers(updatedPeers);
+            // setPeers(updatedPeers);
+            dispatch({ type: "updatePeer", payload: { socketId: user.socketId, isConnected: true } });
         })
 
         remotePeer.on("signal", (data) => {
@@ -247,7 +268,8 @@ const ChatRoom = () => {
 
             peersRef.current = updatedPeers;
 
-            setPeers(updatedPeers);
+            // setPeers(updatedPeers);
+            dispatch({ type: "updatePeer", payload: { socketId: user.socketId, stream } });
         });
 
         remotePeer.on("data", (data) => {
@@ -269,6 +291,16 @@ const ChatRoom = () => {
                     ...prevLastTranscriptions,
                     [message.socketId]: message
                 }));
+                setTranscriptionsPerUser((prev) => {
+                    console.log('test', prev);
+                    return {
+                        ...prev,
+                        [message.socketId]: {
+                            username: message.username,
+                            messages: [...prev[message.socketId]?.messages || [], message]
+                        }
+                    }
+                })
             }
         });
 
@@ -280,7 +312,14 @@ const ChatRoom = () => {
         if (peer) {
             peer.peer.destroy();
             peersRef.current = peersRef.current.filter((p: any) => p.socketId !== socketId);
-            setPeers((prevPeers) => prevPeers.filter((p: any) => p.socketId !== socketId));
+            // setPeers((prevPeers) => prevPeers.filter((p: any) => p.socketId !== socketId));
+            dispatch({ type: "removePeer", payload: socketId });
+
+            setTranscriptionsPerUser((prev) => {
+                const newTranscriptions = { ...prev };
+                delete newTranscriptions[socketId];
+                return newTranscriptions;
+            });
 
             openToast(`${peer.username} left the room!`, 'warn');
         }
@@ -397,7 +436,7 @@ const ChatRoom = () => {
                     type: "transcription",
                     username,
                     content: transcription.transcription,
-                    socketId: localSocketIdRef.current,
+                    socketId: socketRef.current.id,
                     translated: null
                 }));
                 console.log('transcription sent');
@@ -422,12 +461,14 @@ const ChatRoom = () => {
             return p;
         });
 
-        setPeers((prevPeers) => prevPeers.map((p) => {
-            if (p.socketId === peer.socketId) {
-                return peer;
-            }
-            return p;
-        }));
+        // setPeers((prevPeers) => prevPeers.map((p) => {
+        //     if (p.socketId === peer.socketId) {
+        //         return peer;
+        //     }
+        //     return p;
+        // }));
+
+        dispatch({ type: "updatePeer", payload: { socketId: peer.socketId, transcriptionEnabled: enabled } });
 
         openToast(`Transcription ${enabled ? 'enabled' : 'disabled'} for ${peer.username}`, 'info');
 
@@ -437,7 +478,7 @@ const ChatRoom = () => {
     let handleDataAvailable = (event: any) => {
         if (event.size > 0) {
             blobToBase64(event).then(b64 => {
-                console.log('sending audio to whisper service...');
+                // console.log('sending audio to whisper service...');
                 whisperSocketRef.current?.emit('audio', { audio: b64, language: selectedLanguage });
             })
         }
@@ -474,6 +515,10 @@ const ChatRoom = () => {
         recorder.startRecording();
     }
 
+    function getPeer(socketId: string) {
+        return peersRef.current.find((p: any) => p.socketId === socketId);
+    }
+
     async function openToast(content: string, type: string) {
         toast[type](content, {
             position: "top-right",
@@ -500,6 +545,19 @@ const ChatRoom = () => {
         scrollToBottom();
     }, [messages]);
 
+    const scrollRefs = useRef({});
+
+    // Effet pour gérer le scroll automatique pour tous les utilisateurs
+    useEffect(() => {
+        if (transcriptionsPerUser) {
+            Object.keys(transcriptionsPerUser).forEach((key) => {
+                if (scrollRefs.current[key]) {
+                    scrollRefs.current[key].scrollTop = scrollRefs.current[key].scrollHeight;
+                }
+            });
+        }
+    }, [transcriptionsPerUser]);
+
     return (
         <>
             <ToastContainer />
@@ -518,7 +576,7 @@ const ChatRoom = () => {
 
                     <div className="relative z-10 flex w-full h-full mx-auto shadow-3xl overflow-hidden">
                         {/* Sidebar utilisateurs */}
-                        <div
+                        {/* <div
                             className={`fixed z-30 top-0 left-0 h-full bg-gray-700 p-4 rounded-lg shadow-lg transition-transform duration-300 ease-in-out ${isSidebarVisible ? 'translate-x-0' : '-translate-x-full'}`}
                             style={{ width: '250px', paddingTop: '5rem' }}
                         >
@@ -534,10 +592,10 @@ const ChatRoom = () => {
                                     </div>
                                 ))}
                             </ul>
-                        </div>
+                        </div> */}
 
                         {/* Bouton pour cacher/montrer la sidebar */}
-                        <div className="absolute z-40 top-4 left-4 flex items-center">
+                        <div className="absolute z-50 top-4 left-4 flex items-center">
                             <button
                                 onClick={() => setIsSidebarVisible(!isSidebarVisible)}
                                 className="text-gray-300 bg-blue-500 px-3 py-2 rounded hover:bg-blue-600 transition"
@@ -559,6 +617,8 @@ const ChatRoom = () => {
                             </button>
                         </div>
 
+                        <Sidebar username={username} isSidebarVisible={isSidebarVisible} />
+
                         {/* Contenu principal */}
                         <div className="relative flex flex-col justify-between w-full h-full p-4 bg-gray-900 bg-opacity-80 overflow-hidden" style={{ justifyContent: 'space-between' }}>
                             {/* Section des Vidéos */}
@@ -571,7 +631,6 @@ const ChatRoom = () => {
                                                 ref={(video) => video && (video.srcObject = localMediaStreamRef.current)}
                                                 className="w-full h-full object-cover rounded-lg"
                                                 autoPlay
-                                                controls
                                                 muted
                                             />
                                         ) : (
@@ -601,18 +660,61 @@ const ChatRoom = () => {
                                 {/* Vidéos des pairs */}
                                 {peers.map((peer, index) => {
                                     return (
-                                        <PeerVideo key={index} peer={peer} />
+                                        <PeerVideo key={index} peer={peer} toggleTranscription={toggleTranscribe} />
                                     );
                                 })}
                             </div>
 
-                            <div className="w-full p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4 text-white">
+                            {/* <div className="w-full p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4 text-white">
                                 {Object.entries(lastTranscriptions).map(([key, transcription]) => (
                                     <div key={key}>
                                         <h4 className="text-xl">{(transcription as any).username}:</h4>
                                         <p>{(transcription as any).content}</p>
                                     </div>
                                 ))}
+                            </div> */}
+
+                            {/* <TranscriptionsDisplay transcriptionsPerUser={transcriptionsPerUser} /> */}
+
+                            <div className="h-auto flex flex-row flex-wrap justify-center w-full p-6 rounded-lg bg-gray-800 bg-opacity-90 mt-6 text-white gap-6">
+                                {transcriptionsPerUser && Object.keys(transcriptionsPerUser).length > 0 ? (
+                                    Object.entries(transcriptionsPerUser).map(([key, value]) => {
+                                        const isTranscriptionEnabled = peers.find((p: any) => p.socketId === key)?.transcriptionEnabled;
+
+                                        return (
+                                            <div
+                                                key={key}
+                                                className="flex-1 flex flex-col justify-between rounded-lg shadow-lg bg-gray-700 bg-opacity-80 border border-gray-600 p-2 w-[300px] max-w-[400px] transition-all hover:scale-105 hover:shadow-xl">
+                                                {/* Conteneur scrollable des messages */}
+                                                <ul
+                                                    ref={(el) => (scrollRefs.current[key] = el)}
+                                                    className="h-[8em] flex flex-col overflow-y-auto p-2 w-full space-y-2">
+                                                    <div className="mt-auto">
+                                                        {(value as any).messages.map((msg: any, index: number) => (
+                                                            <li
+                                                                key={index}
+                                                                className="text-center my-1 text-lg text-gray-300 bg-gray-800 p-2 rounded-lg break-words overflow-hidden">
+                                                                {msg.content}
+                                                            </li>
+                                                        ))}
+                                                    </div>
+                                                </ul>
+                                                {/* Username en bas avec hover effect */}
+                                                <h4
+                                                    onClick={() => toggleTranscribe(getPeer(key))}
+                                                    className={`flex items-center justify-between text-xl bg-gray-800 p-1 rounded-lg shadow-inner font-semibold mt-2 cursor-pointer transition-all ${isTranscriptionEnabled
+                                                            ? 'hover:bg-red-500 hover:text-white'
+                                                            : 'hover:bg-green-500 hover:text-white'
+                                                        }`}>
+                                                    <span className="flex-grow text-center">{(value as any).username}</span>
+                                                    <span className="ml-2">{isTranscriptionEnabled ? '🟢' : '🔴'}</span>
+                                                </h4>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className="text-center text-lg text-gray-400">No transcriptions available</p>
+                                )}
                             </div>
 
                             {/* Boîte de messages */}

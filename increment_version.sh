@@ -2,7 +2,7 @@
 
 # Paramètres
 TYPE=$1 # Type d'incrément : major, minor, patch
-IMAGE_NAME="crissime/pli-front"
+IMAGE_NAME=$2
 
 # Récupérer le dernier tag depuis Docker Hub
 LAST_TAG=$(curl -s "https://hub.docker.com/v2/repositories/$IMAGE_NAME/tags/?page_size=1" | jq -r '.results[0].name')
@@ -25,6 +25,7 @@ case $TYPE in
     PATCH=0
     ;;
   minor)
+    MAJOR=1
     MINOR=$((MINOR + 1))
     PATCH=0
     ;;
