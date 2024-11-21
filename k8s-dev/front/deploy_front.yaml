@@ -20,7 +20,7 @@ spec:
           name: conf-nginx-dev
       containers:
       - name: front-dev
-        image: crissime/pli-front:dev-dev-1.3.5
+        image: crissime/pli-front:latest
         resources:
           limits:
             memory: "250Mi"
