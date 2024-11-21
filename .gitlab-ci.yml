@@ -53,7 +53,6 @@ calculate_tag_front:
   rules:
     - if:  $CI_COMMIT_MESSAGE =~ /\s*-front\s*/
 
-
 build_whisper:
   stage: build_dev
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
