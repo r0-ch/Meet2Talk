@@ -146,8 +146,8 @@ deploy_to_prod:
   - cat $KUBECONFIG_DATA | base64 -d > kubeconfig
   - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
   - echo "Mise à jour des images pour l'environnement de production..."
-  - 'sed -i "s|image: crissime/pli-front:.*|image:crissime/pli-front:2.0.0|g" k8s-prod/front/deploy_front.yaml'
-  - 'sed -i "s|image: crissime/pli-back:.*|image:crissime/pli-back:2.0.0|g" k8s-prod/backend/deploy_back.yaml'
+  - 'sed -i "s|image: crissime/pli-front:.*|image:crissime/pli-front:${TAG}|g" k8s-prod/front/deploy_front.yaml'
+  - 'sed -i "s|image: crissime/pli-back:.*|image:crissime/pli-back:${TAG}|g" k8s-prod/backend/deploy_back.yaml'
   - kubectl apply -f k8s/front --namespace=prod
   - kubectl apply -f k8s/backend --namespace=prod
   tags:
