@@ -20,7 +20,7 @@ spec:
           name: conf-nginx
       containers:
       - name: front
-        image: ghcr.io/exatombe/pli-front:latest
+        image: crissime/pli-front:latest
         resources:
           limits:
             memory: "250Mi"

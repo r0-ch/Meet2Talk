@@ -17,7 +17,7 @@ spec:
           secretName: mysecret
       containers:
       - name: backend
-        image: ghcr.io/exatombe/pli-back:latest
+        image: crissime/pli-back:latest
         resources:
           limits:
             memory: "500Mi"
