@@ -105,6 +105,7 @@ export default function Home() {
             <h2 className="text-2xl font-bold mb-6 text-center text-gray-200">Join a Room</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
+                aria-label="Set your username"
                 id="username"
                 type="text"
                 placeholder="Enter your username"
@@ -116,6 +117,7 @@ export default function Home() {
 
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <select
+                aria-label="Select favorite language"
                 id="language"
                 value={selectedLanguage}
                 onChange={(e) => setSelectedLanguage(e.target.value)}
@@ -133,6 +135,7 @@ export default function Home() {
 
               <div className="flex items-center">
                 <input
+                  aria-label="New reference tag"
                   id="tag"
                   type="text"
                   placeholder="Add a tag"
@@ -142,6 +145,7 @@ export default function Home() {
                   className="flex-grow focus:outline-none px-4 py-2 focus:ring-2 focus:ring-blue-500 text-gray-200 bg-gray-800 bg-opacity-70 shadow-lg rounded-l"
                 />
                 <button
+                  aria-label="Add the tag"
                   onClick={addTag}
                   className="bg-blue-600 text-white px-4 py-2 rounded-r ml-2 hover:bg-blue-700 focus:outline-none shadow-3xl"
                 >
@@ -167,6 +171,7 @@ export default function Home() {
 
               <div className="flex items-center space-x-2">
                 <input
+                  aria-label="Accept Terms And Conditions"
                   type="checkbox"
                   id="accept-cgu"
                   checked={acceptedCGU}
@@ -179,6 +184,7 @@ export default function Home() {
                 >
                   I accept the{" "}
                   <button
+                    aria-label="Show Terms And Conditions"
                     type="button"
                     onClick={toggleCGUPopup}
                     className="text-blue-500"
@@ -189,6 +195,7 @@ export default function Home() {
               </div>
 
               <button
+                aria-label="Join a room"
                 id="join-room"
                 type="submit"
                 disabled={username.trim() === "" || selectedLanguage === "" || !acceptedCGU}
