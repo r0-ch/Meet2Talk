@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import UserControls from "./UserControls";
 import { usePeersContext } from "./PeersContext";
 
-const PeerVideo = ({ peer }) => {
+const PeerVideo = ({ peer, toggleTranscription }) => {
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const { dispatch } = usePeersContext();
@@ -63,6 +63,7 @@ const PeerVideo = ({ peer }) => {
                     socketId={peer.socketId}
                     onVolumeChange={handleVolumeChange}
                     onClose={() => setControlsVisible(false)}
+                    toggleTranscription={toggleTranscription}
                 />
             )}
         </div>

@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useLocation,useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import Peer from "simple-peer";
 import { ToastContainer, toast, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -10,6 +10,7 @@ import config from "../loadenv";
 import PeerVideo from "./PeerVideo";
 import { usePeersContext } from "./PeersContext";
 import Sidebar from "./Sidebar";
+import TranscriptionsDisplay from "./TranscriptionsDisplay";
 
 interface RemotePeer {
     socketId?: string;
@@ -55,13 +56,21 @@ const ChatRoom = () => {
 
     const peersRef = useRef<any[]>([]);
     // const [peers, setPeers] = useState<any[]>([]);
-    const  { peers, dispatch } = usePeersContext();
+    const { peers, dispatch } = usePeersContext();
 
     const [messages, setMessages] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
     const currentMessageRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null); // Déclaration du type
     const [transcriptions, setTranscriptions] = useState<{ type: string, socketId: string, username: string, content: string, translated: string | null }[]>([]);
     const [lastTranscriptions, setLastTranscriptions] = useState<{}>({});
+    const [transcriptionsPerUser, setTranscriptionsPerUser] = useState({});
+    interface TranscriptionsPerUser {
+        [socketId: string]: {
+            username: string;
+            messages: { content: string }[];
+        };
+    }
+
 
     const [profilePictures, setProfilePictures] = useState<string[]>([]);
     const allProfilePictures = [
@@ -89,6 +98,9 @@ const ChatRoom = () => {
     };
 
     useEffect(() => {
+        console.log(`roomId: ${roomId}`);
+        console.log(`username: ${username}`);
+        console.log(`selectedLanguage: ${selectedLanguage}`);
         console.log(`api: ${config.backurl}`);
 
         const socket = io(`${new URL(config.backurl).origin}`, {
@@ -97,7 +109,7 @@ const ChatRoom = () => {
         socketRef.current = socket;
         localSocketIdRef.current = socket.id;
 
-        const whisperSocket= io(`${new URL(config.whisperurl).origin}`, {
+        const whisperSocket = io(`${new URL(config.whisperurl).origin}`, {
             path: '/socket.io/whisper',
         });
         whisperSocketRef.current = whisperSocket;
@@ -134,7 +146,7 @@ const ChatRoom = () => {
             });
         });
 
-        socket.on("cannot-join", () =>{
+        socket.on("cannot-join", () => {
             navigate("/")
         })
 
@@ -279,6 +291,16 @@ const ChatRoom = () => {
                     ...prevLastTranscriptions,
                     [message.socketId]: message
                 }));
+                setTranscriptionsPerUser((prev) => {
+                    console.log('test', prev);
+                    return {
+                        ...prev,
+                        [message.socketId]: {
+                            username: message.username,
+                            messages: [...prev[message.socketId]?.messages || [], message]
+                        }
+                    }
+                })
             }
         });
 
@@ -292,6 +314,12 @@ const ChatRoom = () => {
             peersRef.current = peersRef.current.filter((p: any) => p.socketId !== socketId);
             // setPeers((prevPeers) => prevPeers.filter((p: any) => p.socketId !== socketId));
             dispatch({ type: "removePeer", payload: socketId });
+
+            setTranscriptionsPerUser((prev) => {
+                const newTranscriptions = { ...prev };
+                delete newTranscriptions[socketId];
+                return newTranscriptions;
+            });
 
             openToast(`${peer.username} left the room!`, 'warn');
         }
@@ -408,7 +436,7 @@ const ChatRoom = () => {
                     type: "transcription",
                     username,
                     content: transcription.transcription,
-                    socketId: localSocketIdRef.current,
+                    socketId: socketRef.current.id,
                     translated: null
                 }));
                 console.log('transcription sent');
@@ -450,7 +478,7 @@ const ChatRoom = () => {
     let handleDataAvailable = (event: any) => {
         if (event.size > 0) {
             blobToBase64(event).then(b64 => {
-                console.log('sending audio to whisper service...');
+                // console.log('sending audio to whisper service...');
                 whisperSocketRef.current?.emit('audio', { audio: b64, language: selectedLanguage });
             })
         }
@@ -487,6 +515,10 @@ const ChatRoom = () => {
         recorder.startRecording();
     }
 
+    function getPeer(socketId: string) {
+        return peersRef.current.find((p: any) => p.socketId === socketId);
+    }
+
     async function openToast(content: string, type: string) {
         toast[type](content, {
             position: "top-right",
@@ -512,6 +544,19 @@ const ChatRoom = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    const scrollRefs = useRef({});
+
+    // Effet pour gérer le scroll automatique pour tous les utilisateurs
+    useEffect(() => {
+        if (transcriptionsPerUser) {
+            Object.keys(transcriptionsPerUser).forEach((key) => {
+                if (scrollRefs.current[key]) {
+                    scrollRefs.current[key].scrollTop = scrollRefs.current[key].scrollHeight;
+                }
+            });
+        }
+    }, [transcriptionsPerUser]);
 
     return (
         <>
@@ -615,18 +660,61 @@ const ChatRoom = () => {
                                 {/* Vidéos des pairs */}
                                 {peers.map((peer, index) => {
                                     return (
-                                        <PeerVideo key={index} peer={peer} />
+                                        <PeerVideo key={index} peer={peer} toggleTranscription={toggleTranscribe} />
                                     );
                                 })}
                             </div>
 
-                            <div className="w-full p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4 text-white">
+                            {/* <div className="w-full p-4 rounded-lg bg-gray-700 bg-opacity-80 overflow-y-auto mt-4 text-white">
                                 {Object.entries(lastTranscriptions).map(([key, transcription]) => (
                                     <div key={key}>
                                         <h4 className="text-xl">{(transcription as any).username}:</h4>
                                         <p>{(transcription as any).content}</p>
                                     </div>
                                 ))}
+                            </div> */}
+
+                            {/* <TranscriptionsDisplay transcriptionsPerUser={transcriptionsPerUser} /> */}
+
+                            <div className="h-auto flex flex-row flex-wrap justify-center w-full p-6 rounded-lg bg-gray-800 bg-opacity-90 mt-6 text-white gap-6">
+                                {transcriptionsPerUser && Object.keys(transcriptionsPerUser).length > 0 ? (
+                                    Object.entries(transcriptionsPerUser).map(([key, value]) => {
+                                        const isTranscriptionEnabled = peers.find((p: any) => p.socketId === key)?.transcriptionEnabled;
+
+                                        return (
+                                            <div
+                                                key={key}
+                                                className="flex-1 flex flex-col justify-between rounded-lg shadow-lg bg-gray-700 bg-opacity-80 border border-gray-600 p-2 w-[300px] max-w-[400px] transition-all hover:scale-105 hover:shadow-xl">
+                                                {/* Conteneur scrollable des messages */}
+                                                <ul
+                                                    ref={(el) => (scrollRefs.current[key] = el)}
+                                                    className="h-[8em] flex flex-col overflow-y-auto p-2 w-full space-y-2">
+                                                    <div className="mt-auto">
+                                                        {(value as any).messages.map((msg: any, index: number) => (
+                                                            <li
+                                                                key={index}
+                                                                className="text-center my-1 text-lg text-gray-300 bg-gray-800 p-2 rounded-lg break-words overflow-hidden">
+                                                                {msg.content}
+                                                            </li>
+                                                        ))}
+                                                    </div>
+                                                </ul>
+                                                {/* Username en bas avec hover effect */}
+                                                <h4
+                                                    onClick={() => toggleTranscribe(getPeer(key))}
+                                                    className={`flex items-center justify-between text-xl bg-gray-800 p-1 rounded-lg shadow-inner font-semibold mt-2 cursor-pointer transition-all ${isTranscriptionEnabled
+                                                            ? 'hover:bg-red-500 hover:text-white'
+                                                            : 'hover:bg-green-500 hover:text-white'
+                                                        }`}>
+                                                    <span className="flex-grow text-center">{(value as any).username}</span>
+                                                    <span className="ml-2">{isTranscriptionEnabled ? '🟢' : '🔴'}</span>
+                                                </h4>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className="text-center text-lg text-gray-400">No transcriptions available</p>
+                                )}
                             </div>
 
                             {/* Boîte de messages */}
