@@ -77,6 +77,7 @@ app.get('/get-room/:id', async (req, res) => {
 
         if (!room) {
             res.status(404).send('Room not found');
+            return;
         }
         res.json(room);
     } catch (err) {
