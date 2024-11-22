@@ -101,7 +101,7 @@ build_prod_front:
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
   - TAG=${TAG}
-  - echo TAG
+  - echo $TAG
   - echo "Construction de l'application pour l'environnement de développement..."
   - 'echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"> /kaniko/.docker/config.json'
   - /kaniko/executor --context ./pli --build-arg VITE_REACT_APP_BACKEND=https://pli.ketsuna.com --build-arg VITE_REACT_APP_WHISPER=https://pli.ketsuna.com/socket.io/whisper --dockerfile Dockerfile --destination crissime/pli-front:${TAG} --cache=true
@@ -115,6 +115,7 @@ build_prod_back:
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
   - TAG=${TAG}
+  - echo $TAG
   - echo "Construction de l'application pour l'environnement de développement..."
   - 'echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}"> /kaniko/.docker/config.json'
   - /kaniko/executor --context ./signaling --build-arg CORS_ORIGIN=https://pli.ketsuna.com --dockerfile Dockerfile --destination crissime/pli-back:${TAG} --cache=true
@@ -174,6 +175,7 @@ deploy_to_prod_back:
   image: bitnami/kubectl:latest
   script:
   - TAG=${TAG}
+  - echo $TAG
   - cat $KUBECONFIG_DATA | base64 -d > kubeconfig
   - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
   - echo "Mise à jour des images pour l'environnement de développement..."
