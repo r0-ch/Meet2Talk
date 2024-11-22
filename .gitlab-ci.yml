@@ -163,7 +163,7 @@ deploy_to_prod_front:
   - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
   - echo "Mise à jour des images pour l'environnement de développement..."
   - 'sed -i "s|image: crissime/pli-front:.*|image: crissime/pli-front:${TAG}|g" k8s/front/deploy_front.yaml'
-  - kubectl apply -f k8s-dev/front --namespace=prod
+  - kubectl apply -f k8s/front --namespace=prod
   tags:
     - k8s
   rules:
@@ -178,7 +178,7 @@ deploy_to_prod_back:
   - export KUBECONFIG=$CI_PROJECT_DIR/kubeconfig
   - echo "Mise à jour des images pour l'environnement de développement..."
   - 'sed -i "s|image: crissime/pli-back:.*|image: crissime/pli-back:${TAG}|g" k8s/backend/deploy_back.yaml'
-  - kubectl apply -f k8s-dev/backend --namespace=prod
+  - kubectl apply -f k8s/backend --namespace=prod
   tags:
     - k8s
   rules:
