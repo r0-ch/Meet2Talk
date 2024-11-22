@@ -1,9 +1,8 @@
 stages:
 - calculate_tag
-- build_dev
-- build_prod
-- deploy_dev
-- deploy_prod
+- build
+- deploy
+
 
 workflow:
   rules:
@@ -57,7 +56,7 @@ calculate_tag_front:
 
 
 build_whisper:
-  stage: build_dev
+  stage: build
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
   - echo "Construction de l'application pour l'environnement de développement..."
@@ -68,8 +67,9 @@ build_whisper:
   tags:
     - build
 
+
 build_front_dev:
-  stage: build_dev
+  stage: build
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
   - TAG=${TAG}
@@ -82,9 +82,8 @@ build_front_dev:
   rules:
   - if: $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_MESSAGE =~ /\s*-front\s*/
 
-
 build_back_dev:
-  stage: build_dev
+  stage: build
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
   - TAG=${TAG}
@@ -96,8 +95,9 @@ build_back_dev:
   rules:
   - if: $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
 
+
 build_prod_front:
-  stage: build_dev
+  stage: build
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
   - TAG=${TAG}
@@ -111,7 +111,7 @@ build_prod_front:
   - if: $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE =~ /\s*-front\s*/
 
 build_prod_back:
-  stage: build_dev
+  stage: build
   image: gcr.io/kaniko-project/executor:v1.11.0-debug
   script:
   - TAG=${TAG}
@@ -126,7 +126,7 @@ build_prod_back:
 
 
 deploy_to_dev_front:
-  stage: deploy_dev
+  stage: deploy
   image: bitnami/kubectl:latest
   script:
   - TAG=${TAG}
@@ -141,7 +141,7 @@ deploy_to_dev_front:
   - if: $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_MESSAGE =~ /\s*-front\s*/ 
 
 deploy_to_dev_back:
-  stage: deploy_dev
+  stage: deploy
   image: bitnami/kubectl:latest
   script:
   - TAG=${TAG}
@@ -155,8 +155,9 @@ deploy_to_dev_back:
   rules:
   - if: $CI_COMMIT_BRANCH != "main" &&  $CI_COMMIT_MESSAGE =~ /\s*-back\s*/
 
+
 deploy_to_prod_front:
-  stage: deploy_dev
+  stage: deploy
   image: bitnami/kubectl:latest
   script:
   - TAG=${TAG}
@@ -168,10 +169,10 @@ deploy_to_prod_front:
   tags:
     - k8s
   rules:
-  - if: $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_MESSAGE =~ /\s*-front\s*/ 
+  - if: $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE =~ /\s*-front\s*/ 
 
 deploy_to_prod_back:
-  stage: deploy_dev
+  stage: deploy
   image: bitnami/kubectl:latest
   script:
   - TAG=${TAG}
